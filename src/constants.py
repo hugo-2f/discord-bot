@@ -1,15 +1,20 @@
 from pathlib import Path
 
-ROOT_DIR = Path(__file__).resolve().parent.parent
+# === Project Root and Paths ===
+ROOT_DIR: Path = Path(__file__).resolve().parent.parent
+AUDIO_DIR: Path = ROOT_DIR / "audios"
+VOLUMES_PATH: Path = AUDIO_DIR / "volumes.json"
+VOLUMES_RELATIVE_PATH: Path = VOLUMES_PATH.relative_to(ROOT_DIR)
+
+# === Audio Settings ===
 AUDIO_EXTENSIONS = [".mp3", ".m4a"]
-AUDIO_DIR = Path(__file__).resolve().parent.parent / "audios"
+DEFAULT_VOLUME: float = 0.4
+
+# === Audio File Names and List ===
+# Note: This will read the directory at import time.
 AUDIO_NAMES = sorted(
     f.stem
     for f in AUDIO_DIR.iterdir()
     if f.is_file() and f.suffix.lower() in AUDIO_EXTENSIONS
 )
 AUDIO_LIST = "\n".join(f"{idx + 1}. {name}" for idx, name in enumerate(AUDIO_NAMES))
-VOLUMES_PATH = AUDIO_DIR / "volumes.json"
-DEFAULT_VOLUME = 0.4
-AUDIO_EXTENSIONS = [".mp3", ".m4a"]
-VOLUMES_RELATIVE_PATH = VOLUMES_PATH.relative_to(ROOT_DIR)
