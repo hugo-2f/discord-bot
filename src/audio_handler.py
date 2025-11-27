@@ -2,8 +2,8 @@ import asyncio
 
 import discord
 
-from constants import AUDIO_DIR, AUDIO_NAMES
-from github_integration import volumes
+import constants
+import volume_manager
 
 stop_playing = False
 
@@ -21,7 +21,7 @@ async def play_audio(voice_client, audio_name):
         return False
 
     print(f"Playing {audio_name}")
-    volume = volumes[audio_name]
+    volume = volume_manager.get_volume(audio_name)
     audio_player = discord.PCMVolumeTransformer(audio_source, volume=volume)
     voice_client.play(audio_player)
     while voice_client.is_playing():
@@ -37,15 +37,15 @@ async def play_audio(voice_client, audio_name):
 def get_audio_source(audio_name):
     try:
         idx = int(audio_name) - 1
-        audio_name = AUDIO_NAMES[idx]
+        audio_name = constants.AUDIO_NAMES[idx]
     except ValueError:
         pass
 
-    if audio_name not in AUDIO_NAMES:  # audio needs to exist
+    if audio_name not in constants.AUDIO_NAMES:  # audio needs to exist
         return None
 
-    mp3_path = AUDIO_DIR / f"{audio_name}.mp3"
-    m4a_path = AUDIO_DIR / f"{audio_name}.m4a"
+    mp3_path = constants.AUDIO_DIR / f"{audio_name}.mp3"
+    m4a_path = constants.AUDIO_DIR / f"{audio_name}.m4a"
     if mp3_path.exists():
         return discord.FFmpegPCMAudio(str(mp3_path))
     elif m4a_path.exists():
