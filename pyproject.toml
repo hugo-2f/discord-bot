@@ -7,7 +7,7 @@ requires-python = ">=3.13"
 dependencies = [
     "asyncio>=4.0.0",
     "discord-py>=2.6.4",
-    "googletrans==3.1.0a0",
     "pynacl>=1.6.1",
     "python-dotenv>=1.2.1",
+    "translate>=3.8.0",
 ]
