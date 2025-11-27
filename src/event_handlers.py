@@ -1,7 +1,5 @@
 import asyncio
-import json
 import os
-from collections import defaultdict
 
 import discord
 from discord import TextChannel
@@ -9,7 +7,6 @@ from discord.ext import commands
 from dotenv import load_dotenv
 from translate import Translator
 
-import constants
 import audio_handler
 
 # ========== Setup ==========
