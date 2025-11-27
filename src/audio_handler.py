@@ -1,11 +1,12 @@
-import discord
 import asyncio
-from github_integration import volumes
-import os
-from constants import AUDIO_NAMES, AUDIO_PATH
 
+import discord
+
+from constants import AUDIO_DIR, AUDIO_NAMES
+from github_integration import volumes
 
 stop_playing = False
+
 
 async def play_audio(voice_client, audio_name):
     """
@@ -16,10 +17,10 @@ async def play_audio(voice_client, audio_name):
 
     audio_source = get_audio_source(audio_name)
     if not audio_source:
-        print(f'Audio not found: {audio_name}')
+        print(f"Audio not found: {audio_name}")
         return False
 
-    print(f'Playing {audio_name}')
+    print(f"Playing {audio_name}")
     volume = volumes[audio_name]
     audio_player = discord.PCMVolumeTransformer(audio_source, volume=volume)
     voice_client.play(audio_player)
@@ -40,17 +41,17 @@ def get_audio_source(audio_name):
     except ValueError:
         pass
 
-    if audio_name not in AUDIO_NAMES: # audio needs to exist
+    if audio_name not in AUDIO_NAMES:  # audio needs to exist
         return None
 
-    mp3_path = os.path.join(AUDIO_PATH, f'{audio_name}.mp3')
-    m4a_path = os.path.join(AUDIO_PATH, f'{audio_name}.m4a')
-    if os.path.exists(mp3_path):
-        return discord.FFmpegPCMAudio(mp3_path)
-    elif os.path.exists(m4a_path):
-        return discord.FFmpegPCMAudio(m4a_path)
+    mp3_path = AUDIO_DIR / f"{audio_name}.mp3"
+    m4a_path = AUDIO_DIR / f"{audio_name}.m4a"
+    if mp3_path.exists():
+        return discord.FFmpegPCMAudio(str(mp3_path))
+    elif m4a_path.exists():
+        return discord.FFmpegPCMAudio(str(m4a_path))
     else:
-        print(f'Issue with {audio_name}: not mp3 or m4a')
+        print(f"Issue with {audio_name}: no mp3 or m4a file")
         return None
 
 
