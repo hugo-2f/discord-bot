@@ -22,19 +22,9 @@ def set_commands(bot):
     @bot.command()
     async def play(ctx, audio_name: str, channel=None):
         async with command_lock:
-            try:
-                idx = int(audio_name) - 1
-                if 0 <= idx < len(constants.AUDIO_NAMES):
-                    audio_name = constants.AUDIO_NAMES[idx]
-            except (ValueError, TypeError):
-                pass
-
-            if (
-                ctx.author.bot
-                or not audio_name
-                or audio_name not in constants.AUDIO_NAMES
-            ):
+            if ctx.author.bot or not audio_handler.audio_exists(audio_name):
                 return
+
             # execute command after current audio finishes
             if ctx.voice_client and ctx.voice_client.is_playing():
                 await asyncio.sleep(1)
@@ -145,21 +135,16 @@ def set_commands(bot):
             await voice_channel.connect()
 
     @bot.command()
-    async def vol(ctx, audio, volume: float | None = None):
-        try:
-            idx = int(audio) - 1
-            audio = constants.AUDIO_NAMES[idx]
-        except (ValueError, TypeError):
-            pass
-        if audio not in constants.AUDIO_NAMES:
-            await ctx.reply(f"Audio '{audio}' not found.")
+    async def vol(ctx, audio_name: str, volume: float | None = None):
+        if not audio_handler.audio_exists(audio_name):
+            await ctx.reply(f"Audio '{audio_name}' not found.")
             return
         if volume is None:
-            current_volume = volume_manager.get_volume(audio)
+            current_volume = volume_manager.get_volume(audio_name)
             await ctx.reply(f"Current volume: {current_volume}")
         elif 0 <= volume <= 1:
-            volume_manager.set_volume(audio, volume)
-            print(f'"{audio}" now has volume {volume}')
+            volume_manager.set_volume(audio_name, volume)
+            print(f'"{audio_name}" now has volume {volume}')
 
     @bot.command()
     async def audios(ctx):

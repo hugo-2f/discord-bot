@@ -9,7 +9,8 @@ from discord.ext import commands
 from dotenv import load_dotenv
 from translate import Translator
 
-from constants import AUDIO_NAMES, VOLUMES_PATH
+import constants
+import audio_handler
 
 # ========== Setup ==========
 # Initialize bot
@@ -34,10 +35,6 @@ country_flags = {
     "🇨🇳": "zh-cn",
 }
 
-# Initialize audios and volumes
-with open(VOLUMES_PATH, "r") as f:
-    volumes = defaultdict(lambda: DEFAULT_VOLUME, json.load(f))
-
 
 # ========== Setup bot events ==========
 def set_events(bot):
@@ -58,7 +55,7 @@ def set_events(bot):
 
         if payload.emoji.name in country_flags and TRANSLATE:
             to_lang = country_flags[payload.emoji.name]
-            print(f"Translating {payload.emoji.name} to {to_lang}")
+            print(f"Translating message to {to_lang}")
             translation = Translator(to_lang=to_lang).translate(msg.content)
             await msg.reply(translation)
 
@@ -91,7 +88,7 @@ def set_events(bot):
             await bot_voice_client.move_to(after.channel)
 
         await asyncio.sleep(1.5)  # wait for them to connect to the channel
-        await play_audio(bot_voice_client, "nihao")
+        await audio_handler.play_audio(bot_voice_client, "nihao")
 
         if prev_voice_channel is not None:
             await bot_voice_client.move_to(prev_voice_channel)
@@ -137,42 +134,3 @@ def set_events(bot):
             return
         deleted_message = f"{msg.author.display_name} just recalled:\n{msg.content}"
         await msg.channel.send(deleted_message)
-
-
-async def play_audio(voice_client, audio_name):
-    global stop_playing
-    try:
-        idx = int(audio_name) - 1
-        audio_name = AUDIO_NAMES[idx]
-    except ValueError:
-        pass
-    audio_source = get_audio_source(audio_name)
-    if not audio_source:
-        print(f"Audio not found: {audio_name}")
-        return
-
-    print(f"Playing {audio_name}")
-    volume = volumes[audio_name]
-    audio_player = discord.PCMVolumeTransformer(audio_source, volume=volume)
-    voice_client.play(audio_player)
-    while voice_client.is_playing():
-        await asyncio.sleep(1)
-        if stop_playing:
-            stop_playing = False
-            voice_client.stop()
-            print("Audio stopped")
-            return
-
-
-def get_audio_source(audio_name):
-    try:
-        idx = int(audio_name) - 1
-        audio_name = AUDIO_NAMES[idx]
-    except ValueError:
-        pass
-    audio_source = None
-    if os.path.exists(f"audios/{audio_name}.mp3"):  # audio needs to exist
-        audio_source = discord.FFmpegPCMAudio(f"audios/{audio_name}.mp3")
-    elif os.path.exists(f"audios/{audio_name}.m4a"):
-        audio_source = discord.FFmpegPCMAudio(f"audios/{audio_name}.m4a")
-    return audio_source

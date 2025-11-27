@@ -8,6 +8,16 @@ import volume_manager
 stop_playing = False
 
 
+async def audio_exists(audio_name: str) -> bool:
+    try:
+        idx = int(audio_name) - 1
+        audio_name = constants.AUDIO_NAMES[idx]
+    except (ValueError, TypeError):
+        pass
+
+    return audio_name in constants.AUDIO_NAMES
+
+
 async def play_audio(voice_client, audio_name):
     """
     :return: only for replay command: True if continue replaying,
@@ -34,14 +44,8 @@ async def play_audio(voice_client, audio_name):
     return True
 
 
-def get_audio_source(audio_name):
-    try:
-        idx = int(audio_name) - 1
-        audio_name = constants.AUDIO_NAMES[idx]
-    except ValueError:
-        pass
-
-    if audio_name not in constants.AUDIO_NAMES:  # audio needs to exist
+def get_audio_source(audio_name: str):
+    if not audio_exists(audio_name):
         return None
 
     mp3_path = constants.AUDIO_DIR / f"{audio_name}.mp3"
