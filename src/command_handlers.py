@@ -44,20 +44,28 @@ def set_commands(bot: commands.Bot) -> None:
                 return
 
             # execute command after current audio finishes
-            if ctx.voice_client and ctx.voice_client.is_playing():
+            if (
+                isinstance(ctx.voice_client, discord.VoiceClient)
+                and ctx.voice_client.is_playing()
+            ):
                 await asyncio.sleep(1)
 
-            author_voice_channel = (
-                ctx.author.voice.channel if ctx.author.voice else None
-            )
+            author = ctx.author
+            if isinstance(author, discord.Member) and author.voice:
+                author_voice_channel = author.voice.channel
+            else:
+                author_voice_channel = None
+
             if channel:
+                if not ctx.guild:
+                    return
                 voice_channel = discord.utils.get(
                     ctx.guild.voice_channels, name=channel
                 )
             else:
                 voice_channel = (
                     ctx.voice_client.channel
-                    if ctx.voice_client
+                    if isinstance(ctx.voice_client, discord.VoiceClient)
                     else author_voice_channel
                 )
 
@@ -66,18 +74,26 @@ def set_commands(bot: commands.Bot) -> None:
 
             # go back (or leave) to previous channel after playing audio
             bot_voice_client = ctx.voice_client
-            prev_voice_channel = bot_voice_client.channel if bot_voice_client else None
-            if bot_voice_client and bot_voice_client.channel != voice_channel:
+            if isinstance(bot_voice_client, discord.VoiceClient):
+                prev_voice_channel = bot_voice_client.channel
+            else:
+                prev_voice_channel = None
+
+            if (
+                isinstance(bot_voice_client, discord.VoiceClient)
+                and bot_voice_client.channel != voice_channel
+            ):
                 await bot_voice_client.move_to(voice_channel)
             elif not bot_voice_client:
                 bot_voice_client = await voice_channel.connect()
 
-            await audio_playback_handler.play_audio(bot_voice_client, audio_name)
+            if isinstance(bot_voice_client, discord.VoiceClient):
+                await audio_playback_handler.play_audio(bot_voice_client, audio_name)
 
-            if prev_voice_channel is not None:
-                await bot_voice_client.move_to(prev_voice_channel)
-            else:
-                await bot_voice_client.disconnect()
+                if prev_voice_channel is not None:
+                    await bot_voice_client.move_to(prev_voice_channel)
+                else:
+                    await bot_voice_client.disconnect()
 
     @bot.command()
     async def replay(
@@ -101,14 +117,22 @@ def set_commands(bot: commands.Bot) -> None:
             ):
                 return
             # execute command after current audio finishes
-            if ctx.voice_client and ctx.voice_client.is_playing():
+            if (
+                isinstance(ctx.voice_client, discord.VoiceClient)
+                and ctx.voice_client.is_playing()
+            ):
                 await asyncio.sleep(1)
 
-            author_voice_channel = (
-                ctx.author.voice.channel if ctx.author.voice else None
-            )
+            author = ctx.author
+            if isinstance(author, discord.Member) and author.voice:
+                author_voice_channel = author.voice.channel
+            else:
+                author_voice_channel = None
+
             voice_channel = (
-                ctx.voice_client.channel if ctx.voice_client else author_voice_channel
+                ctx.voice_client.channel
+                if isinstance(ctx.voice_client, discord.VoiceClient)
+                else author_voice_channel
             )
 
             if voice_channel is None:
@@ -116,26 +140,35 @@ def set_commands(bot: commands.Bot) -> None:
 
             # go back (or leave) to previous channel after playing audio
             bot_voice_client = ctx.voice_client
-            prev_voice_channel = bot_voice_client.channel if bot_voice_client else None
-            if bot_voice_client and bot_voice_client.channel != voice_channel:
+            if isinstance(bot_voice_client, discord.VoiceClient):
+                prev_voice_channel = bot_voice_client.channel
+            else:
+                prev_voice_channel = None
+
+            if (
+                isinstance(bot_voice_client, discord.VoiceClient)
+                and bot_voice_client.channel != voice_channel
+            ):
                 await bot_voice_client.move_to(voice_channel)
             elif not bot_voice_client:
                 bot_voice_client = await voice_channel.connect()
 
             try:
-                for _ in range(count):
-                    keep_playing = await audio_playback_handler.play_audio(
-                        bot_voice_client, audio_name
-                    )
-                    if not keep_playing:
-                        logger.info("Replay stopped")
-                        break
+                if isinstance(bot_voice_client, discord.VoiceClient):
+                    for _ in range(count):
+                        keep_playing = await audio_playback_handler.play_audio(
+                            bot_voice_client, audio_name
+                        )
+                        if not keep_playing:
+                            logger.info("Replay stopped")
+                            break
             finally:
                 # Move back to previous channel or disconnect
-                if prev_voice_channel is not None:
-                    await bot_voice_client.move_to(prev_voice_channel)
-                else:
-                    await bot_voice_client.disconnect()
+                if isinstance(bot_voice_client, discord.VoiceClient):
+                    if prev_voice_channel is not None:
+                        await bot_voice_client.move_to(prev_voice_channel)
+                    else:
+                        await bot_voice_client.disconnect()
 
     @bot.command()
     async def join(ctx: commands.Context, channel: str | None = None) -> None:
@@ -146,17 +179,24 @@ def set_commands(bot: commands.Bot) -> None:
             channel: Optional name of the channel to join.
         """
         if channel:
+            if not ctx.guild:
+                return
             voice_channel = discord.utils.get(ctx.guild.voice_channels, name=channel)
 
             if voice_channel is None:  # not a valid channel
                 return
         else:
-            voice_channel = ctx.author.voice.channel if ctx.author.voice else None
+            author = ctx.author
+            if isinstance(author, discord.Member) and author.voice:
+                voice_channel = author.voice.channel
+            else:
+                voice_channel = None
+
             if voice_channel is None:
                 return  # no channel and author not in a channel
         # check if the bot is already in a voice channel
         voice_client = ctx.voice_client
-        if voice_client:
+        if isinstance(voice_client, discord.VoiceClient):
             # if the bot is already in the specified voice channel, do nothing
             if voice_client.channel == voice_channel:
                 return
@@ -199,7 +239,8 @@ def set_commands(bot: commands.Bot) -> None:
             return
 
         # disconnect the bot from the current voice channel
-        await ctx.voice_client.disconnect()
+        if isinstance(ctx.voice_client, discord.VoiceClient):
+            await ctx.voice_client.disconnect()
 
     @bot.command()
     async def stop(ctx):
@@ -226,6 +267,7 @@ def set_commands(bot: commands.Bot) -> None:
         if not isinstance(channel, (TextChannel, DMChannel)):
             logger.error("Invalid channel")
             return
+
         users = None
         if "," in msg:
             msg, users = msg.rsplit(",", 1)
@@ -257,7 +299,10 @@ def set_commands(bot: commands.Bot) -> None:
 
         try:
             user_obj = bot.get_user(USER_IDS[user])
-            await user_obj.send(msg)
+            if user_obj:
+                await user_obj.send(msg)
+            else:
+                logger.warning(f"User object for {user} not found")
         except AttributeError as e:
             logger.error(
                 "Likely error: the bot can only send to users that have shared a server with the bot"
