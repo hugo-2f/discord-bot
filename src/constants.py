@@ -17,4 +17,14 @@ AUDIO_NAMES = sorted(
     for f in AUDIO_DIR.iterdir()
     if f.is_file() and f.suffix.lower() in AUDIO_EXTENSIONS
 )
+AUDIO_NAMES_SET = set(AUDIO_NAMES)
 AUDIO_LIST = "\n".join(f"{idx + 1}. {name}" for idx, name in enumerate(AUDIO_NAMES))
+
+# === Translation Settings ===
+COUNTRY_FLAGS = {
+    "🇺🇸": "en",
+    "🇫🇷": "fr",
+    "🇪🇸": "es",
+    "🇯🇵": "ja",
+    "🇨🇳": "zh-cn",
+}

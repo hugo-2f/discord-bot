@@ -1,15 +1,18 @@
 import asyncio
 import configparser
+import logging
 
 import discord
 from discord import DMChannel, TextChannel
+from discord.ext import commands
 
-import audio_handler
+import audio_playback_handler
 import constants
 import volume_manager
 
-config = configparser.ConfigParser()
+logger = logging.getLogger(__name__)
 CONFIG_PATH = constants.ROOT_DIR / "variables.ini"
+config = configparser.ConfigParser()
 config.read(CONFIG_PATH)
 USER_IDS = {key: int(value) for key, value in config["USER_IDS"].items()}
 CHANNEL_IDS = {key: int(value) for key, value in config["CHANNEL_IDS"].items()}
@@ -18,11 +21,26 @@ channel_name = config["SETTINGS"]["channel_name"]
 command_lock = asyncio.Lock()
 
 
-def set_commands(bot):
+def set_commands(bot: commands.Bot) -> None:
+    """
+    Register all command handlers for the bot.
+    Args:
+        bot: The Discord bot instance.
+    """
+
     @bot.command()
-    async def play(ctx, audio_name: str, channel=None):
+    async def play(
+        ctx: commands.Context, audio_name: str, channel: str | None = None
+    ) -> None:
+        """
+        Play an audio file in a voice channel.
+        Args:
+            ctx: The command context.
+            audio_name: The name of the audio to play.
+            channel: Optional voice channel to join.
+        """
         async with command_lock:
-            if ctx.author.bot or not audio_handler.audio_exists(audio_name):
+            if ctx.author.bot or not audio_playback_handler.audio_exists(audio_name):
                 return
 
             # execute command after current audio finishes
@@ -54,7 +72,7 @@ def set_commands(bot):
             elif not bot_voice_client:
                 bot_voice_client = await voice_channel.connect()
 
-            await audio_handler.play_audio(bot_voice_client, audio_name)
+            await audio_playback_handler.play_audio(bot_voice_client, audio_name)
 
             if prev_voice_channel is not None:
                 await bot_voice_client.move_to(prev_voice_channel)
@@ -62,7 +80,16 @@ def set_commands(bot):
                 await bot_voice_client.disconnect()
 
     @bot.command()
-    async def replay(ctx, audio_name=None, count=0):
+    async def replay(
+        ctx: commands.Context, audio_name: str | None = None, count: int = 0
+    ) -> None:
+        """
+        Replay an audio file multiple times.
+        Args:
+            ctx: The command context.
+            audio_name: The name of the audio to replay.
+            count: The number of times to replay.
+        """
         if count == 0:
             return
 
@@ -70,7 +97,7 @@ def set_commands(bot):
             if (
                 ctx.author.bot
                 or not audio_name
-                or audio_name not in constants.AUDIO_NAMES
+                or audio_name not in constants.AUDIO_NAMES_SET
             ):
                 return
             # execute command after current audio finishes
@@ -97,11 +124,11 @@ def set_commands(bot):
 
             try:
                 for _ in range(count):
-                    keep_playing = await audio_handler.play_audio(
+                    keep_playing = await audio_playback_handler.play_audio(
                         bot_voice_client, audio_name
                     )
                     if not keep_playing:
-                        print("Replay stopped")
+                        logger.info("Replay stopped")
                         break
             finally:
                 # Move back to previous channel or disconnect
@@ -111,7 +138,13 @@ def set_commands(bot):
                     await bot_voice_client.disconnect()
 
     @bot.command()
-    async def join(ctx, channel=None):
+    async def join(ctx: commands.Context, channel: str | None = None) -> None:
+        """
+        Join a voice channel.
+        Args:
+            ctx: The command context.
+            channel: Optional name of the channel to join.
+        """
         if channel:
             voice_channel = discord.utils.get(ctx.guild.voice_channels, name=channel)
 
@@ -136,7 +169,7 @@ def set_commands(bot):
 
     @bot.command()
     async def vol(ctx, audio_name: str, volume: float | None = None):
-        if not audio_handler.audio_exists(audio_name):
+        if not audio_playback_handler.audio_exists(audio_name):
             await ctx.reply(f"Audio '{audio_name}' not found.")
             return
         if volume is None:
@@ -144,14 +177,16 @@ def set_commands(bot):
             await ctx.reply(f"Current volume: {current_volume}")
         elif 0 <= volume <= 1:
             volume_manager.set_volume(audio_name, volume)
-            print(f'"{audio_name}" now has volume {volume}')
+            logger.info(f'"{audio_name}" now has volume {volume}')
 
     @bot.command()
-    async def audios(ctx):
+    async def audios(ctx: commands.Context) -> None:
+        """List all available audio files."""
         await ctx.reply(constants.AUDIO_LIST)
 
     @bot.command()
-    async def help(ctx):
+    async def help(ctx: commands.Context) -> None:
+        """Show help message."""
         await ctx.reply(
             "Commands: play <name/id> (channel), stop_playing, join, leave, audios, vol <name> <volume>"
         )
@@ -168,7 +203,7 @@ def set_commands(bot):
 
     @bot.command()
     async def stop(ctx):
-        audio_handler.set_stop_playing()
+        audio_playback_handler.set_stop_playing()
 
     @bot.command()
     async def send(ctx, *, msg: str):
@@ -184,12 +219,12 @@ def set_commands(bot):
             !send asdf fsg, gaj -> send '@fsg @gaj asdf'
         """
         if not msg:
-            await ctx.reply(set(USER_IDS.keys()))
+            await ctx.reply(str(set(USER_IDS.keys())))
             return
 
         channel = bot.get_channel(CHANNEL_IDS[channel_name])
         if not isinstance(channel, (TextChannel, DMChannel)):
-            print("Invalid channel")
+            logger.error("Invalid channel")
             return
         users = None
         if "," in msg:
@@ -206,32 +241,39 @@ def set_commands(bot):
         await channel.send(f"{' '.join(users_to_mention)} {msg}")
 
     @bot.command()
-    async def send_dm(ctx, *, msg: str):
+    async def send_dm(ctx: commands.Context, *, msg: str) -> None:
         """
-        !send_dm <msg>, <user>
+        Send a DM to a user.
+        Format: !send_dm <msg>, <user>
         """
         if "," not in msg:
-            print("No user selected")
+            logger.warning("No user selected")
             return
         msg, user = msg.rsplit(",", 1)
         user = user.strip().lower()
         if user not in USER_IDS:
-            print(f"User {user} not found")
+            logger.warning(f"User {user} not found")
             return
 
         try:
             user_obj = bot.get_user(USER_IDS[user])
             await user_obj.send(msg)
         except AttributeError as e:
-            print(
+            logger.error(
                 "Likely error: the bot can only send to users that have shared a server with the bot"
             )
-            print(e)
+            logger.error(e)
         except Exception as e:
-            print(e)
+            logger.error(e)
 
     @bot.command()
-    async def setChannel(ctx, new_channel):
+    async def setChannel(ctx: commands.Context, new_channel: str) -> None:
+        """
+        Set the channel for the !send command.
+        Args:
+            ctx: The command context.
+            new_channel: The name of the new channel.
+        """
         global channel_name
         channel_name = new_channel
-        print(f"Current channel: {channel_name} - {CHANNEL_IDS[channel_name]}")
+        logger.info(f"Current channel: {channel_name} - {CHANNEL_IDS[channel_name]}")

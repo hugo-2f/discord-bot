@@ -1,46 +1,38 @@
 import asyncio
-import os
+import logging
 
 import discord
 from discord import TextChannel
 from discord.ext import commands
-from dotenv import load_dotenv
 from translate import Translator
 
-import audio_handler
+import audio_playback_handler
+import constants
+
+logger = logging.getLogger(__name__)
 
 # ========== Setup ==========
-# Initialize bot
-load_dotenv()  # Load environment variables from .env file
-TOKEN = os.getenv("DISCORD_TOKEN")  # Discord bot token
-COMMAND_PREFIX = "!"
-bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=discord.Intents.all())
-bot.remove_command("help")  # to define custom help command
 
 
-# ========== Global variables ==========
-DEFAULT_VOLUME = 0.4
-TRANSLATE = True
-JUAN = False
-stop_playing = False
-
-country_flags = {
-    "🇺🇸": "en",
-    "🇫🇷": "fr",
-    "🇪🇸": "es",
-    "🇯🇵": "ja",
-    "🇨🇳": "zh-cn",
-}
-
-
-# ========== Setup bot events ==========
-def set_events(bot):
-    @bot.event
-    async def on_ready():
-        print(f"Logged in as {bot.user}")
+def set_events(bot: commands.Bot) -> None:
+    """
+    Register all event handlers for the bot.
+    Args:
+        bot: The Discord bot instance.
+    """
 
     @bot.event
-    async def on_raw_reaction_add(payload):
+    async def on_ready() -> None:
+        """Log when the bot is ready."""
+        logger.info(f"Logged in as {bot.user}")
+
+    @bot.event
+    async def on_raw_reaction_add(payload: discord.RawReactionActionEvent) -> None:
+        """
+        Translate a message when a country flag reaction is added.
+        Args:
+            payload: The raw reaction event payload.
+        """
         user = await bot.fetch_user(payload.user_id)
         if user.bot:
             return
@@ -50,21 +42,25 @@ def set_events(bot):
         else:
             return
 
-        if payload.emoji.name in country_flags and TRANSLATE:
-            to_lang = country_flags[payload.emoji.name]
-            print(f"Translating message to {to_lang}")
+        if payload.emoji.name in constants.COUNTRY_FLAGS:
+            to_lang = constants.COUNTRY_FLAGS[payload.emoji.name]
+            logger.info(f"Translating '{msg.content}' to {to_lang}")
             translation = Translator(to_lang=to_lang).translate(msg.content)
             await msg.reply(translation)
 
     @bot.event
-    async def on_voice_state_update(member, before, after):
+    async def on_voice_state_update(
+        member: discord.Member,
+        before: discord.VoiceState,
+        after: discord.VoiceState,
+    ) -> None:
         """
-        When someone joins a channel, join them and play nihao.mp3
+        When someone joins a channel, join them and play nihao.mp3.
         """
         if member.bot or after.channel is None or before.channel == after.channel:
             return
 
-        bot_voice_client = None
+        bot_voice_client: discord.VoiceClient | None = None
         for voice_client in bot.voice_clients:
             if (
                 isinstance(voice_client, discord.VoiceClient)
@@ -73,9 +69,7 @@ def set_events(bot):
                 bot_voice_client = voice_client
                 break
 
-        if (
-            bot_voice_client and bot_voice_client.is_playing()
-        ):  # wait until prev audio finishes
+        if bot_voice_client and bot_voice_client.is_playing():
             await asyncio.sleep(1)
 
         prev_voice_channel = bot_voice_client.channel if bot_voice_client else None
@@ -84,8 +78,8 @@ def set_events(bot):
         elif bot_voice_client.channel != after.channel:
             await bot_voice_client.move_to(after.channel)
 
-        await asyncio.sleep(1.5)  # wait for them to connect to the channel
-        await audio_handler.play_audio(bot_voice_client, "nihao")
+        await asyncio.sleep(1.5)  # wait for user to connect to voice channel
+        await audio_playback_handler.play_audio(bot_voice_client, "nihao")
 
         if prev_voice_channel is not None:
             await bot_voice_client.move_to(prev_voice_channel)
@@ -93,41 +87,42 @@ def set_events(bot):
             await bot_voice_client.disconnect(force=True)
 
     @bot.event
-    async def on_message(msg):
-        if msg.author.bot:  # only react to humans
-            return
-
-        if msg.content.startswith(COMMAND_PREFIX):
-            print(msg.content)
-            command = msg.content.split()[0][len(COMMAND_PREFIX) :]
-            if command in bot.all_commands:
-                if (
-                    any(c in command for c in ["play", "join", "leave", "stop"])
-                    or command == "vol"
-                    and len(msg.content.split()) > 2
-                ):  # only when a volume is given
-                    await msg.delete()
-                await bot.process_commands(msg)
-        elif JUAN:
-            response = None
-            if "别卷" in msg.content:
-                response = "对啊就是"
-            elif "卷" in msg.content:
-                response = "ayayay别卷了"
-            else:
-                if msg.author.name == "dcm9":
-                    response = "zhm别卷了来打吧"
-            if response:
-                await msg.reply(response)
-
-    @bot.event
-    async def on_message_delete(msg):
-        # process human messages only
+    async def on_message(msg: discord.Message) -> None:
+        """
+        Handle incoming messages, process commands, and respond to certain keywords.
+        Args:
+            msg: The message object.
+        """
         if msg.author.bot:
             return
 
-        # don't echo commands deleted by the bot
-        if msg.content.startswith(bot.command_prefix):
+        ctx = await bot.get_context(msg)
+        if ctx.valid:
+            logger.info(f"Command received: {msg.content}")
+            if ctx.command:
+                command_name = ctx.command.name
+                if command_name in ["play", "join", "leave", "stop"]:
+                    await msg.delete()
+                elif (
+                    command_name == "vol" and len(msg.content.split()) > 2
+                ):  # delete message if '!vol audio_name value'
+                    await msg.delete()
+
+            await bot.invoke(ctx)
+
+    @bot.event
+    async def on_message_delete(msg: discord.Message) -> None:
+        """
+        Echo deleted messages, except for bot commands.
+        Args:
+            msg: The deleted message object.
+        """
+        if msg.author.bot:
             return
+
+        ctx = await bot.get_context(msg)
+        if ctx.valid:
+            return
+
         deleted_message = f"{msg.author.display_name} just recalled:\n{msg.content}"
         await msg.channel.send(deleted_message)

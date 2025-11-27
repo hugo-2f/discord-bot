@@ -1,3 +1,4 @@
+import logging
 import os
 
 import discord
@@ -8,19 +9,25 @@ import command_handlers
 import event_handlers
 from constants import ROOT_DIR
 
-# Initialize bot
-dotenv_path = ROOT_DIR / ".env"
-load_dotenv(dotenv_path)
-TOKEN = os.getenv("DISCORD_TOKEN")
+# Logging config
+logging.basicConfig(
+    level=logging.INFO,
+    format="[惊吓魔盒] %(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
 
-bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
-bot.remove_command("help")  # to define custom help command
+# Initialize bot
+COMMAND_PREFIX = "!"
+bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=discord.Intents.all())
+bot.remove_command("help")
 
 # Set events and commands
 event_handlers.set_events(bot)
 command_handlers.set_commands(bot)
 
 # Start bot
+dotenv_path = ROOT_DIR / ".env"
+load_dotenv(dotenv_path)
+TOKEN = os.getenv("DISCORD_TOKEN")
 if TOKEN is None:
     raise RuntimeError("DISCORD_TOKEN not found in environment variables")
 bot.run(TOKEN)
