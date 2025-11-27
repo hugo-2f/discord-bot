@@ -21,10 +21,16 @@ AUDIO_NAMES_SET = set(AUDIO_NAMES)
 AUDIO_LIST = "\n".join(f"{idx + 1}. {name}" for idx, name in enumerate(AUDIO_NAMES))
 
 # === Translation Settings ===
+# To add to this list, see emojipedia.org
 COUNTRY_FLAGS = {
     "🇺🇸": "en",
     "🇫🇷": "fr",
     "🇪🇸": "es",
     "🇯🇵": "ja",
     "🇨🇳": "zh-cn",
+    "🇩🇪": "de",
+    "🇮🇹": "it",
+    "🇷🇺": "ru",
+    "🇰🇷": "ko",
+    "🇧🇷": "pt",
 }
