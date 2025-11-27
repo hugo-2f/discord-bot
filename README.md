@@ -2,10 +2,14 @@
 Translates messages (sometimes) and plays music
 
 ### Setup
-1. Run `pip install -r requirements.txt`
+1. Install uv
+    1. `curl -LsSf https://astral.sh/uv/install.sh | sh`
+    2. `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
+3. `uv sync`
 2. Create `.env` file with "DISCORD_TOKEN=your_token"
 
-[//]: # (5. Run `drive_integration.py` to initialize `credentials.json` &#40;delete if already exists&#41;)
+4. Run `drive_integration.py` to initialize `credentials.json` delete if already exists
+5. Get `variables.ini`
 
 ### Running the bot
-Run [`main.py`](./src/main.py) or `python ./src/main.py`
+`uv run src/main.py`
