@@ -4,7 +4,7 @@ import subprocess
 import sys
 from collections import defaultdict
 
-from constants import AUDIO_NAMES, VOLUMES_PATH
+from constants import AUDIO_NAMES, VOLUMES_PATH, VOLUMES_RELATIVE_PATH
 
 # initialize audio volumes
 DEFAULT_VOLUME = 0.4
@@ -22,11 +22,11 @@ def fetch_newest_volumes():
         # Fetch the latest changes from the remote repository
         subprocess.run(["git", "fetch"], check=True)
 
-        # Checkout only the latest version of volumes.json
+        # Checkout the latest version of volumes.json
         subprocess.run(
-            ["git", "checkout", "origin/main", "--", str(VOLUMES_PATH)], check=True
+            ["git", "checkout", "origin/main", "--", str(VOLUMES_RELATIVE_PATH)],
+            check=True,
         )
-
         print("Successfully fetched volumes.json")
 
     except subprocess.CalledProcessError as e:
