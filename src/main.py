@@ -1,9 +1,11 @@
 import os
-from dotenv import load_dotenv
+
 import discord
 from discord.ext import commands
-import event_handlers
+from dotenv import load_dotenv
+
 import command_handlers
+import event_handlers
 from constants import ROOT_DIR
 
 # initialize bot
