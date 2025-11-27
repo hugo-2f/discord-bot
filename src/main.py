@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 
 import command_handlers
 import event_handlers
+import volume_manager
 from constants import ROOT_DIR
 
 # Logging config
@@ -23,6 +24,9 @@ bot.remove_command("help")
 # Set events and commands
 event_handlers.set_events(bot)
 command_handlers.set_commands(bot)
+
+# Initialize volumes
+volume_manager.fetch_and_initialize_volumes()
 
 # Start bot
 dotenv_path = ROOT_DIR / ".env"

@@ -3,7 +3,6 @@ import configparser
 import logging
 
 import discord
-from discord import DMChannel, TextChannel
 from discord.ext import commands
 
 import audio_playback_handler
@@ -264,7 +263,7 @@ def set_commands(bot: commands.Bot) -> None:
             return
 
         channel = bot.get_channel(CHANNEL_IDS[channel_name])
-        if not isinstance(channel, (TextChannel, DMChannel)):
+        if not isinstance(channel, (discord.TextChannel, discord.DMChannel)):
             logger.error("Invalid channel")
             return
 

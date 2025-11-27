@@ -2,7 +2,6 @@ import asyncio
 import logging
 
 import discord
-from discord import TextChannel
 from discord.ext import commands
 from translate import Translator
 
@@ -37,7 +36,7 @@ def set_events(bot: commands.Bot) -> None:
         if user.bot:
             return
         channel = await bot.fetch_channel(payload.channel_id)
-        if isinstance(channel, TextChannel):
+        if isinstance(channel, discord.TextChannel):
             msg = await channel.fetch_message(payload.message_id)
         else:
             return
