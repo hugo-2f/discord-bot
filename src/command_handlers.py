@@ -1,7 +1,5 @@
 import asyncio
 import configparser
-import json
-from collections import defaultdict
 
 import discord
 from discord import DMChannel, TextChannel
@@ -11,10 +9,8 @@ from constants import (
     AUDIO_LIST,
     AUDIO_NAMES,
     ROOT_DIR,
-    DEFAULT_VOLUME,
-    VOLUMES_PATH,
 )
-from github_integration import volumes
+from github_integration import volumes, set_volumes_changed
 
 config = configparser.ConfigParser()
 CONFIG_PATH = ROOT_DIR / "variables.ini"
@@ -24,11 +20,6 @@ CHANNEL_IDS = {key: int(value) for key, value in config["CHANNEL_IDS"].items()}
 channel_name = config["SETTINGS"]["channel_name"]
 
 command_lock = asyncio.Lock()
-
-# Initialize audios and volumes
-AUDIO_EXTENSIONS = [".mp3", ".m4a"]
-with open(VOLUMES_PATH, "r") as f:
-    volumes = defaultdict(lambda: DEFAULT_VOLUME, json.load(f))
 
 
 def set_commands(bot):
@@ -159,6 +150,7 @@ def set_commands(bot):
             await ctx.reply(f"Current volume: {volume}")
         elif 0 <= volume <= 1:
             volumes[audio] = volume
+            set_volumes_changed()
             print(f'"{audio}" now has volume {volume}')
 
     @bot.command()

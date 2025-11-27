@@ -13,27 +13,26 @@ volumes_changed = False
 
 
 def set_volumes_changed():
+    """Mark that the audio volumes have been changed and need to be saved."""
     global volumes_changed
     volumes_changed = True
 
 
 def fetch_newest_volumes():
+    """Fetch the latest volumes.json from the GitHub repository."""
     try:
-        # Fetch the latest changes from the remote repository
         subprocess.run(["git", "fetch"], check=True)
-
-        # Checkout the latest version of volumes.json
         subprocess.run(
             ["git", "checkout", "origin/main", "--", str(VOLUMES_RELATIVE_PATH)],
             check=True,
         )
-        print("Successfully fetched volumes.json")
-
+        print("[fetch_newest_volumes] Successfully fetched volumes.json")
     except subprocess.CalledProcessError as e:
-        print(f"Failed to fetch newest volumes: {e}")
+        print(f"[fetch_newest_volumes] Failed to fetch newest volumes: {e}")
 
 
 def initialize_volumes():
+    """Load audio volumes from the volumes.json file."""
     global volumes
     try:
         with open(VOLUMES_PATH, "r", encoding="utf-8") as f:
@@ -42,20 +41,21 @@ def initialize_volumes():
                 lambda: DEFAULT_VOLUME, json.loads(volume_file_content)
             )
     except FileNotFoundError:
-        print(f"'{VOLUMES_PATH}' not found")
+        print(f"[initialize_volumes] '{VOLUMES_PATH}' not found")
         sys.exit()
     except json.JSONDecodeError:
         print(
-            f"Error: Failed to parse '{VOLUMES_PATH}'. Ensure it contains valid JSON."
+            f"[initialize_volumes] Error: Failed to parse '{VOLUMES_PATH}'. Ensure it contains valid JSON."
         )
         sys.exit()
 
 
 @atexit.register
-def update_volumes():
+def update_volumes() -> None:
+    """Update and push volumes.json to GitHub if there are changes."""
     global volumes_changed
     if not volumes or not volumes_changed:
-        print("Volumes not changed, no need to push to GitHub")
+        print("[update_volumes] Volumes not changed, no need to push to GitHub")
         return
 
     # remove unnecessary entries in VOLUMES
@@ -68,14 +68,19 @@ def update_volumes():
 
     # Push to GitHub
     try:
-        subprocess.run(["git", "add", "volumes.json"], check=True)
+        subprocess.run(["git", "add", VOLUMES_RELATIVE_PATH], check=True)
         subprocess.run(["git", "commit", "-m", "update volumes.json"], check=True)
         subprocess.run(["git", "push", "origin", "main"], check=True)
-        print("volumes.json pushed to GitHub")
+        print("[update_volumes] volumes.json pushed to GitHub")
     except subprocess.CalledProcessError as e:
-        print(f"Failed to push volumes.json: {e}")
+        print(f"[update_volumes] Failed to push volumes.json: {e}")
 
 
-# Startup
-fetch_newest_volumes()
-initialize_volumes()
+def main() -> None:
+    """Startup routine to fetch and initialize volumes."""
+    fetch_newest_volumes()
+    initialize_volumes()
+
+
+if __name__ == "__main__":
+    main()
