@@ -1,29 +1,49 @@
 import asyncio
-from googletrans import Translator
-from audio_handler import play_audio
+import json
+import os
+from collections import defaultdict
 
-"""
-global variables
-"""
+import discord
+from discord import TextChannel
+from discord.ext import commands
+from dotenv import load_dotenv
+from translate import Translator
+
+from constants import AUDIO_NAMES, VOLUMES_PATH
+
+# ========== Setup ==========
+# Initialize bot
+load_dotenv()  # Load environment variables from .env file
+TOKEN = os.getenv("DISCORD_TOKEN")  # Discord bot token
+COMMAND_PREFIX = "!"
+bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=discord.Intents.all())
+bot.remove_command("help")  # to define custom help command
+
+
+# ========== Global variables ==========
 DEFAULT_VOLUME = 0.4
 TRANSLATE = True
 JUAN = False
 stop_playing = False
 
 country_flags = {
-    '🇺🇸': 'en',
-    '🇫🇷': 'fr',
-    '🇪🇸': 'es',
-    '🇯🇵': 'ja',
-    '🇨🇳': 'zh-cn',
+    "🇺🇸": "en",
+    "🇫🇷": "fr",
+    "🇪🇸": "es",
+    "🇯🇵": "ja",
+    "🇨🇳": "zh-cn",
 }
 
-translator = Translator()
+# Initialize audios and volumes
+with open(VOLUMES_PATH, "r") as f:
+    volumes = defaultdict(lambda: DEFAULT_VOLUME, json.load(f))
 
+
+# ========== Setup bot events ==========
 def set_events(bot):
     @bot.event
     async def on_ready():
-        print(f'Logged in as {bot.user}')
+        print(f"Logged in as {bot.user}")
 
     @bot.event
     async def on_raw_reaction_add(payload):
@@ -31,13 +51,16 @@ def set_events(bot):
         if user.bot:
             return
         channel = await bot.fetch_channel(payload.channel_id)
-        msg = await channel.fetch_message(payload.message_id)
+        if isinstance(channel, TextChannel):
+            msg = await channel.fetch_message(payload.message_id)
+        else:
+            return
 
         if payload.emoji.name in country_flags and TRANSLATE:
-            lang = country_flags[payload.emoji.name]
-            print(f'Translating {payload.emoji.name} to {lang}')
-            translation = translator.translate(msg.content, dest=lang)
-            await msg.reply(translation.text)
+            to_lang = country_flags[payload.emoji.name]
+            print(f"Translating {payload.emoji.name} to {to_lang}")
+            translation = Translator(to_lang=to_lang).translate(msg.content)
+            await msg.reply(translation)
 
     @bot.event
     async def on_voice_state_update(member, before, after):
@@ -49,11 +72,16 @@ def set_events(bot):
 
         bot_voice_client = None
         for voice_client in bot.voice_clients:
-            if voice_client.guild == member.guild:
+            if (
+                isinstance(voice_client, discord.VoiceClient)
+                and voice_client.guild == member.guild
+            ):
                 bot_voice_client = voice_client
                 break
 
-        if bot_voice_client and bot_voice_client.is_playing():  # wait until prev audio finishes
+        if (
+            bot_voice_client and bot_voice_client.is_playing()
+        ):  # wait until prev audio finishes
             await asyncio.sleep(1)
 
         prev_voice_channel = bot_voice_client.channel if bot_voice_client else None
@@ -63,7 +91,7 @@ def set_events(bot):
             await bot_voice_client.move_to(after.channel)
 
         await asyncio.sleep(1.5)  # wait for them to connect to the channel
-        await play_audio(bot_voice_client, 'nihao')
+        await play_audio(bot_voice_client, "nihao")
 
         if prev_voice_channel is not None:
             await bot_voice_client.move_to(prev_voice_channel)
@@ -75,22 +103,26 @@ def set_events(bot):
         if msg.author.bot:  # only react to humans
             return
 
-        if msg.content.startswith(bot.command_prefix):
-            command = msg.content.split()[0][len(bot.command_prefix):]
+        if msg.content.startswith(COMMAND_PREFIX):
+            print(msg.content)
+            command = msg.content.split()[0][len(COMMAND_PREFIX) :]
             if command in bot.all_commands:
-                if any(c in command for c in ['play', 'join', 'leave', 'stop']) \
-                        or command == 'vol' and len(msg.content.split()) > 2:  # only when a volume is given
+                if (
+                    any(c in command for c in ["play", "join", "leave", "stop"])
+                    or command == "vol"
+                    and len(msg.content.split()) > 2
+                ):  # only when a volume is given
                     await msg.delete()
                 await bot.process_commands(msg)
         elif JUAN:
             response = None
-            if '别卷' in msg.content:
-                response = '对啊就是'
-            elif '卷' in msg.content:
-                response = 'ayayay别卷了'
+            if "别卷" in msg.content:
+                response = "对啊就是"
+            elif "卷" in msg.content:
+                response = "ayayay别卷了"
             else:
-                if msg.author.name == 'dcm9':
-                    response = 'zhm别卷了来打吧'
+                if msg.author.name == "dcm9":
+                    response = "zhm别卷了来打吧"
             if response:
                 await msg.reply(response)
 
@@ -105,3 +137,42 @@ def set_events(bot):
             return
         deleted_message = f"{msg.author.display_name} just recalled:\n{msg.content}"
         await msg.channel.send(deleted_message)
+
+
+async def play_audio(voice_client, audio_name):
+    global stop_playing
+    try:
+        idx = int(audio_name) - 1
+        audio_name = AUDIO_NAMES[idx]
+    except ValueError:
+        pass
+    audio_source = get_audio_source(audio_name)
+    if not audio_source:
+        print(f"Audio not found: {audio_name}")
+        return
+
+    print(f"Playing {audio_name}")
+    volume = volumes[audio_name]
+    audio_player = discord.PCMVolumeTransformer(audio_source, volume=volume)
+    voice_client.play(audio_player)
+    while voice_client.is_playing():
+        await asyncio.sleep(1)
+        if stop_playing:
+            stop_playing = False
+            voice_client.stop()
+            print("Audio stopped")
+            return
+
+
+def get_audio_source(audio_name):
+    try:
+        idx = int(audio_name) - 1
+        audio_name = AUDIO_NAMES[idx]
+    except ValueError:
+        pass
+    audio_source = None
+    if os.path.exists(f"audios/{audio_name}.mp3"):  # audio needs to exist
+        audio_source = discord.FFmpegPCMAudio(f"audios/{audio_name}.mp3")
+    elif os.path.exists(f"audios/{audio_name}.m4a"):
+        audio_source = discord.FFmpegPCMAudio(f"audios/{audio_name}.m4a")
+    return audio_source
