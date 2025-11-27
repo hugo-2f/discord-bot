@@ -1,7 +1,6 @@
-import os
 from pathlib import Path
 
-CURRENT_DIR = os.path.dirname(__file__)
+ROOT_DIR = Path(__file__).resolve().parent.parent
 AUDIO_EXTENSIONS = [".mp3", ".m4a"]
 AUDIO_DIR = Path(__file__).resolve().parent.parent / "audios"
 AUDIO_NAMES = sorted(

@@ -1,9 +1,7 @@
 import asyncio
 import configparser
 import json
-import os
 from collections import defaultdict
-from pathlib import Path
 
 import discord
 from discord import DMChannel, TextChannel
@@ -12,14 +10,14 @@ from audio_handler import play_audio, set_stop_playing
 from constants import (
     AUDIO_LIST,
     AUDIO_NAMES,
-    CURRENT_DIR,
+    ROOT_DIR,
     DEFAULT_VOLUME,
     VOLUMES_PATH,
 )
 from github_integration import volumes
 
 config = configparser.ConfigParser()
-CONFIG_PATH = os.path.join(CURRENT_DIR, "..", "variables.ini")
+CONFIG_PATH = ROOT_DIR / "variables.ini"
 config.read(CONFIG_PATH)
 USER_IDS = {key: int(value) for key, value in config["USER_IDS"].items()}
 CHANNEL_IDS = {key: int(value) for key, value in config["CHANNEL_IDS"].items()}
