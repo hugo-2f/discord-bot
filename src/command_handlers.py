@@ -39,7 +39,9 @@ def set_commands(bot: commands.Bot) -> None:
             channel: Optional voice channel to join.
         """
         async with command_lock:
-            if ctx.author.bot or not audio_playback_handler.audio_exists(audio_name):
+            if ctx.author.bot or not audio_playback_handler.resolve_audio_name(
+                audio_name
+            ):
                 return
 
             # execute command after current audio finishes
@@ -112,7 +114,7 @@ def set_commands(bot: commands.Bot) -> None:
             if (
                 ctx.author.bot
                 or not audio_name
-                or audio_name not in constants.AUDIO_NAMES_SET
+                or not audio_playback_handler.resolve_audio_name(audio_name)
             ):
                 return
             # execute command after current audio finishes
@@ -208,15 +210,16 @@ def set_commands(bot: commands.Bot) -> None:
 
     @bot.command()
     async def vol(ctx, audio_name: str, volume: float | None = None):
-        if not audio_playback_handler.audio_exists(audio_name):
+        resolved_name = audio_playback_handler.resolve_audio_name(audio_name)
+        if not resolved_name:
             await ctx.reply(f"Audio '{audio_name}' not found.")
             return
         if volume is None:
-            current_volume = volume_manager.get_volume(audio_name)
+            current_volume = volume_manager.get_volume(resolved_name)
             await ctx.reply(f"Current volume: {current_volume}")
         elif 0 <= volume <= 1:
-            volume_manager.set_volume(audio_name, volume)
-            logger.info(f'"{audio_name}" now has volume {volume}')
+            volume_manager.set_volume(resolved_name, volume)
+            logger.info(f'"{resolved_name}" now has volume {volume}')
 
     @bot.command()
     async def audios(ctx: commands.Context) -> None:
