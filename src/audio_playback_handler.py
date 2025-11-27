@@ -47,7 +47,7 @@ def get_audio_source(audio_name: str) -> discord.FFmpegPCMAudio | None:
     elif m4a_path.exists():
         return discord.FFmpegPCMAudio(str(m4a_path))
     else:
-        logger.warning(f"Issue with {resolved_name}: no mp3 or m4a file")
+        logger.warning(f"Issue with {resolved_name}: no mp3 or m4a file found")
         return None
 
 
