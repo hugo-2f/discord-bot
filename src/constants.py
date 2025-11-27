@@ -12,3 +12,4 @@ AUDIO_NAMES = sorted(
 AUDIO_LIST = "\n".join(f"{idx + 1}. {name}" for idx, name in enumerate(AUDIO_NAMES))
 VOLUMES_PATH = AUDIO_DIR / "volumes.json"
 DEFAULT_VOLUME = 0.4
+AUDIO_EXTENSIONS = [".mp3", ".m4a"]
