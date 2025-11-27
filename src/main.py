@@ -13,7 +13,7 @@ from constants import ROOT_DIR
 # Logging config
 logging.basicConfig(
     level=logging.INFO,
-    format="[惊吓魔盒] %(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 
 # Initialize bot
