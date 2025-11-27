@@ -163,9 +163,15 @@ def set_commands(bot):
     @bot.command()
     async def send(ctx, *, msg: str):
         """
-        command format: !send msg (, people to mention separated by spaces)
-        sends msg and mentions user if not None
-        prints people that can be mentioned if msg is None
+        Command format: !send <msg> <people to mention separated by spaces>
+        Sends msg and mentions user if not None
+        Prints people that can be mentioned if msg is None
+
+        See variables.ini for users
+        Ex:
+            !send asdf -> send 'asdf' in current channel
+            !send asdf fsg -> send '@fsg asdf'
+            !send asdf fsg, gaj -> send '@fsg @gaj asdf'
         """
         if not msg:
             await ctx.reply(set(USER_IDS.keys()))
@@ -189,7 +195,7 @@ def set_commands(bot):
     @bot.command()
     async def send_dm(ctx, *, msg: str):
         """
-        !send_dm msg, user
+        !send_dm <msg>, <user>
         """
         if ',' not in msg:
             print('No user selected')
