@@ -1,92 +1,60 @@
 import asyncio
+import atexit
+import json
 import os
+from collections import defaultdict
+from pathlib import Path
+
 import discord
+from discord import DMChannel, TextChannel
 from discord.ext import commands
 from dotenv import load_dotenv
-from googletrans import Translator
-import json
-import atexit
-from pydrive.auth import GoogleAuth
-from pydrive.drive import GoogleDrive
-from collections import defaultdict
-import sys
+from translate import Translator
 
-
-"""
-global variables
-"""
+# ========== Global variables ==========
 DEFAULT_VOLUME = 0.4
 TRANSLATE = True
 JUAN = False
 stop_playing = False
 
 country_flags = {
-    '🇺🇸': 'en',
-    '🇫🇷': 'fr',
-    '🇪🇸': 'es',
-    '🇯🇵': 'ja',
-    '🇨🇳': 'zh-cn',
+    "🇺🇸": "en",
+    "🇫🇷": "fr",
+    "🇪🇸": "es",
+    "🇯🇵": "ja",
+    "🇨🇳": "zh-cn",
 }
 
-AUDIO_NAMES = sorted(list(file.split('.')[0] for file in os.listdir('../audios')))
-AUDIO_LIST = '\n'.join(f"{idx + 1}. {file}" for idx, file in enumerate(AUDIO_NAMES))
 
-
-"""
-initializing
-"""
-# initialize bot
+# ========== Setup ==========
+# Initialize bot
 load_dotenv()  # Load environment variables from .env file
-TOKEN = os.getenv('DISCORD_TOKEN')  # Discord bot token
-bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
+TOKEN = os.getenv("DISCORD_TOKEN")  # Discord bot token
+COMMAND_PREFIX = "!"
+bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=discord.Intents.all())
 bot.remove_command("help")  # to define custom help command
 
-# initialize misc.
-translator = Translator()
+# Initialize misc.
 command_lock = asyncio.Lock()
 
-# initialize pydrive
-google_auth = GoogleAuth()
-drive = GoogleDrive(google_auth)
-
-# initialize msg_counts
-file_list = drive.ListFile({'q': "'root' in parents and trashed=false"}).GetList()
-msg_file = None
-for file in file_list:
-    if file['title'] == 'msg.json':
-        msg_file = file
-        break
-
-if msg_file:
-    msg_file_content = msg_file.GetContentString()
-    msg_counts = defaultdict(int, json.loads(msg_file_content))
-    print('Current msg.json:', msg_counts)
-else:
-    print("'msg.json' not found")
-    sys.exit()
-
-# initialize audio volumes
-volume_file = None
-for file in file_list:
-    if file['title'] == 'volumes.json':
-        volume_file = file
-        break
-
-if volume_file:
-    volume_file_content = volume_file.GetContentString()
-    volumes = defaultdict(lambda: DEFAULT_VOLUME, json.loads(volume_file_content))
-else:
-    print("'volumes.json' not found")
-    sys.exit()
+# Initialize audios and volumes
+AUDIO_EXTENSIONS = [".mp3", ".m4a"]
+AUDIO_DIR = Path(__file__).resolve().parent.parent / "audios"
+AUDIO_NAMES = sorted(
+    f.stem
+    for f in AUDIO_DIR.iterdir()
+    if f.is_file() and f.suffix.lower() in AUDIO_EXTENSIONS
+)
+AUDIO_LIST = "\n".join(f"{idx + 1}. {name}" for idx, name in enumerate(AUDIO_NAMES))
+VOLUMES_PATH = AUDIO_DIR / "volumes.json"
+with open(VOLUMES_PATH, "r") as f:
+    volumes = defaultdict(lambda: DEFAULT_VOLUME, json.load(f))
 
 
-"""
-bot events and commands
-"""
-
+# ========== Bot events and commands ==========
 @bot.event
 async def on_ready():
-    print(f'Logged in as {bot.user}')
+    print(f"Logged in as {bot.user}")
 
 
 @bot.event
@@ -95,13 +63,16 @@ async def on_raw_reaction_add(payload):
     if user.bot:
         return
     channel = await bot.fetch_channel(payload.channel_id)
-    msg = await channel.fetch_message(payload.message_id)
+    if isinstance(channel, TextChannel):
+        msg = await channel.fetch_message(payload.message_id)
+    else:
+        return
 
     if payload.emoji.name in country_flags and TRANSLATE:
-        lang = country_flags[payload.emoji.name]
-        print(f'Translating {payload.emoji.name} to {lang}')
-        translation = translator.translate(msg.content, dest=lang)
-        await msg.reply(translation.text)
+        to_lang = country_flags[payload.emoji.name]
+        print(f"Translating {payload.emoji.name} to {to_lang}")
+        translation = Translator(to_lang=to_lang).translate(msg.content)
+        await msg.reply(translation)
 
 
 @bot.event
@@ -114,11 +85,16 @@ async def on_voice_state_update(member, before, after):
 
     bot_voice_client = None
     for voice_client in bot.voice_clients:
-        if voice_client.guild == member.guild:
+        if (
+            isinstance(voice_client, discord.VoiceClient)
+            and voice_client.guild == member.guild
+        ):
             bot_voice_client = voice_client
             break
 
-    if bot_voice_client and bot_voice_client.is_playing():  # wait until prev audio finishes
+    if (
+        bot_voice_client and bot_voice_client.is_playing()
+    ):  # wait until prev audio finishes
         await asyncio.sleep(1)
 
     prev_voice_channel = bot_voice_client.channel if bot_voice_client else None
@@ -128,7 +104,7 @@ async def on_voice_state_update(member, before, after):
         await bot_voice_client.move_to(after.channel)
 
     await asyncio.sleep(1.5)  # wait for them to connect to the channel
-    await play_audio(bot_voice_client, 'nihao')
+    await play_audio(bot_voice_client, "nihao")
 
     if prev_voice_channel is not None:
         await bot_voice_client.move_to(prev_voice_channel)
@@ -141,26 +117,26 @@ async def on_message(msg):
     if msg.author.bot:  # only react to humans
         return
 
-    # record message counts in GMZ
-    if msg.guild and msg.guild.id == 885632562691719230:
-        msg_counts[msg.author.name] += 1
-
-    if msg.content.startswith(bot.command_prefix):
-        command = msg.content.split()[0][len(bot.command_prefix):]
+    if msg.content.startswith(COMMAND_PREFIX):
+        print(msg.content)
+        command = msg.content.split()[0][len(COMMAND_PREFIX) :]
         if command in bot.all_commands:
-            if any(c in command for c in ['play', 'join', 'leave', 'stop']) \
-                    or command == 'vol' and len(msg.content.split()) > 2:  # only when a volume is given
+            if (
+                any(c in command for c in ["play", "join", "leave", "stop"])
+                or command == "vol"
+                and len(msg.content.split()) > 2
+            ):  # only when a volume is given
                 await msg.delete()
             await bot.process_commands(msg)
     elif JUAN:
         response = None
-        if '别卷' in msg.content:
-            response = '对啊就是'
-        elif '卷' in msg.content:
-            response = 'ayayay别卷了'
+        if "别卷" in msg.content:
+            response = "对啊就是"
+        elif "卷" in msg.content:
+            response = "ayayay别卷了"
         else:
-            if msg.author.name == 'dcm9':
-                response = 'zhm别卷了来打吧'
+            if msg.author.name == "dcm9":
+                response = "zhm别卷了来打吧"
         if response:
             await msg.reply(response)
 
@@ -191,7 +167,9 @@ async def play(ctx, audio_name=None, channel=None):
         if channel:
             voice_channel = discord.utils.get(ctx.guild.voice_channels, name=channel)
         else:
-            voice_channel = ctx.voice_client.channel if ctx.voice_client else author_voice_channel
+            voice_channel = (
+                ctx.voice_client.channel if ctx.voice_client else author_voice_channel
+            )
 
         if voice_channel is None:
             return
@@ -221,10 +199,10 @@ async def play_audio(voice_client, audio_name):
         pass
     audio_source = get_audio_source(audio_name)
     if not audio_source:
-        print(f'Audio not found: {audio_name}')
+        print(f"Audio not found: {audio_name}")
         return
 
-    print(f'Playing {audio_name}')
+    print(f"Playing {audio_name}")
     volume = volumes[audio_name]
     audio_player = discord.PCMVolumeTransformer(audio_source, volume=volume)
     voice_client.play(audio_player)
@@ -244,10 +222,10 @@ def get_audio_source(audio_name):
     except ValueError:
         pass
     audio_source = None
-    if os.path.exists(f'audios/{audio_name}.mp3'):  # audio needs to exist
-        audio_source = discord.FFmpegPCMAudio(f'audios/{audio_name}.mp3')
-    elif os.path.exists(f'audios/{audio_name}.m4a'):
-        audio_source = discord.FFmpegPCMAudio(f'audios/{audio_name}.m4a')
+    if os.path.exists(f"audios/{audio_name}.mp3"):  # audio needs to exist
+        audio_source = discord.FFmpegPCMAudio(f"audios/{audio_name}.mp3")
+    elif os.path.exists(f"audios/{audio_name}.m4a"):
+        audio_source = discord.FFmpegPCMAudio(f"audios/{audio_name}.m4a")
     return audio_source
 
 
@@ -277,7 +255,7 @@ async def join(ctx, channel=None):
 
 
 @bot.command()
-async def vol(ctx, audio, volume: float = None):
+async def vol(ctx, audio, volume: float | None = None):
     try:
         idx = int(audio) - 1
         audio = AUDIO_NAMES[idx]
@@ -285,7 +263,7 @@ async def vol(ctx, audio, volume: float = None):
         pass
     if volume is None:
         volume = volumes[audio]
-        await ctx.reply(f'Current volume: {volume}')
+        await ctx.reply(f"Current volume: {volume}")
     elif 0 <= volume <= 1:
         volumes[audio] = volume
         print(f'"{audio}" now has volume {volume}')
@@ -298,14 +276,16 @@ async def audios(ctx):
 
 @bot.command()
 async def help(ctx):
-    await ctx.reply("Commands: play <name/id> (channel), stop_playing, join, leave, audios, vol <name> <volume>")
+    await ctx.reply(
+        "Commands: play <name/id> (channel), stop_playing, join, leave, audios, vol <name> <volume>"
+    )
 
 
 @bot.command()
 async def leave(ctx):
     # check if the bot is in a voice channel
     if ctx.author.bot or not ctx.voice_client:
-        print('Bot is not currently in a voice channel.')
+        print("Bot is not currently in a voice channel.")
         return
 
     # disconnect the bot from the current voice channel
@@ -319,24 +299,24 @@ async def stop(ctx):
 
 
 USER_IDS = {
-    'cato': 332017992068104204,
-    'zhm': 687778165573287972,
-    'sdl': 597662493074259972,
-    'glnt': 676967387370618880,
-    'gaj': 675332441388351489,
-    'ltz': 880604419903881216,
-    'wms': 689384461313507342,
-    'xh': 674838013045506067,
-    'me': 827541553476010005,
-    'carl': 754547462147932210,
-    'ap': 891395220124626944,
+    "cato": 332017992068104204,
+    "zhm": 687778165573287972,
+    "sdl": 597662493074259972,
+    "glnt": 676967387370618880,
+    "gaj": 675332441388351489,
+    "ltz": 880604419903881216,
+    "wms": 689384461313507342,
+    "xh": 674838013045506067,
+    "me": 827541553476010005,
+    "carl": 754547462147932210,
+    "ap": 891395220124626944,
 }
 CHANNEL_IDS = {
     # Gimme Zhu
-    'general': 885632562691719233,
-    'juaneral': 983893953701101609,
+    "general": 885632562691719233,
+    "juaneral": 983893953701101609,
 }
-channel_name = 'general'  # default channel
+channel_name = "general"  # default channel
 
 
 @bot.command()
@@ -351,9 +331,12 @@ async def send(ctx, *, msg: str):
         return
 
     channel = bot.get_channel(CHANNEL_IDS[channel_name])
+    if not isinstance(channel, (TextChannel, DMChannel)):
+        print("Invalid channel")
+        return
     users = None
-    if ',' in msg:
-        msg, users = msg.rsplit(',', 1)
+    if "," in msg:
+        msg, users = msg.rsplit(",", 1)
 
     if not users:
         await channel.send(f"{msg}")
@@ -371,66 +354,46 @@ async def send_dm(ctx, *, msg: str):
     """
     !send_dm msg, user
     """
-    if ',' not in msg:
-        print('No user selected')
+    if "," not in msg:
+        print("No user selected")
         return
-    msg, user = msg.rsplit(',', 1)
+    msg, user = msg.rsplit(",", 1)
     user_obj = bot.get_user(USER_IDS[user.strip()])
-    await user_obj.send(msg)
+    if user_obj is not None:
+        await user_obj.send(msg)
+    else:
+        print(f"User {user} not found")
 
 
 @bot.command()
 async def setChannel(ctx, new_channel):
     global channel_name
     channel_name = new_channel
-    print(f'Current channel: {channel_name} - {CHANNEL_IDS[channel_name]}')
-
-
-@bot.command()
-async def message_count(ctx, *args):
-    if len(args) == 0:
-        for user in msg_counts:
-            await ctx.send(f"{user} has sent {msg_counts[user]} message(s).")
-    else:
-        for arg in args:
-            if arg not in msg_counts:
-                await ctx.send(f"{arg} has not sent any messages.")
-            else:
-                await ctx.send(f"{arg} has sent {msg_counts[arg]} message(s).")
-
-
-@bot.command()
-async def clear_msg(ctx):
-    global msg_counts
-    msg_counts = defaultdict(int)
-    print('Message counts cleared')
+    print(f"Current channel: {channel_name} - {CHANNEL_IDS[channel_name]}")
 
 
 @atexit.register
 def update_volumes():
-    # remove unnecessary entries in VOLUMES
+    # remove unnecessary entries
     to_remove = []
     for audio, volume in volumes.items():
-        if not (os.path.exists(f'audios/{audio}.mp3')
-                or os.path.exists(f'audios/{audio}.m4a')) \
-                or volume == DEFAULT_VOLUME:
+        audio_mp3 = AUDIO_DIR / "audios" / f"{audio}.mp3"
+        audio_m4a = AUDIO_DIR / "audios" / f"{audio}.m4a"
+
+        if (
+            not audio_mp3.exists() and not audio_m4a.exists()
+        ) or volume == DEFAULT_VOLUME:
             to_remove.append(audio)
+
     for audio in to_remove:
         del volumes[audio]
 
-    volume_file.SetContentString(json.dumps(volumes, indent=4))
-    volume_file.Upload()
-    print('volume.json updated in Google Drive')
+    # write back to volumes.json
+    VOLUMES_PATH.write_text(json.dumps(volumes, indent=4), encoding="utf-8")
+
+    print("volumes.json updated locally")
 
 
-@atexit.register
-def update_msg_counts():
-    """
-    Updates the msg.json file when the bot is exited.
-    """
-    msg_file.SetContentString(json.dumps(msg_counts, indent=4))
-    msg_file.Upload()
-    print('msg.json updated in Google Drive')
-
-
+if TOKEN is None:
+    raise RuntimeError("DISCORD_TOKEN not found in environment variables")
 bot.run(TOKEN)  # Start the Discord bot
