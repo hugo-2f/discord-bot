@@ -4,16 +4,12 @@ import configparser
 import discord
 from discord import DMChannel, TextChannel
 
-from audio_handler import play_audio, set_stop_playing
-from constants import (
-    AUDIO_LIST,
-    AUDIO_NAMES,
-    ROOT_DIR,
-)
-from github_integration import volumes, set_volumes_changed
+import audio_handler
+import constants
+import volume_manager
 
 config = configparser.ConfigParser()
-CONFIG_PATH = ROOT_DIR / "variables.ini"
+CONFIG_PATH = constants.ROOT_DIR / "variables.ini"
 config.read(CONFIG_PATH)
 USER_IDS = {key: int(value) for key, value in config["USER_IDS"].items()}
 CHANNEL_IDS = {key: int(value) for key, value in config["CHANNEL_IDS"].items()}
@@ -28,12 +24,16 @@ def set_commands(bot):
         async with command_lock:
             try:
                 idx = int(audio_name) - 1
-                if 0 <= idx < len(AUDIO_NAMES):
-                    audio_name = AUDIO_NAMES[idx]
+                if 0 <= idx < len(constants.AUDIO_NAMES):
+                    audio_name = constants.AUDIO_NAMES[idx]
             except (ValueError, TypeError):
                 pass
 
-            if ctx.author.bot or not audio_name or audio_name not in AUDIO_NAMES:
+            if (
+                ctx.author.bot
+                or not audio_name
+                or audio_name not in constants.AUDIO_NAMES
+            ):
                 return
             # execute command after current audio finishes
             if ctx.voice_client and ctx.voice_client.is_playing():
@@ -64,7 +64,7 @@ def set_commands(bot):
             elif not bot_voice_client:
                 bot_voice_client = await voice_channel.connect()
 
-            await play_audio(bot_voice_client, audio_name)
+            await audio_handler.play_audio(bot_voice_client, audio_name)
 
             if prev_voice_channel is not None:
                 await bot_voice_client.move_to(prev_voice_channel)
@@ -77,7 +77,11 @@ def set_commands(bot):
             return
 
         async with command_lock:
-            if ctx.author.bot or not audio_name or audio_name not in AUDIO_NAMES:
+            if (
+                ctx.author.bot
+                or not audio_name
+                or audio_name not in constants.AUDIO_NAMES
+            ):
                 return
             # execute command after current audio finishes
             if ctx.voice_client and ctx.voice_client.is_playing():
@@ -103,7 +107,9 @@ def set_commands(bot):
 
             try:
                 for _ in range(count):
-                    keep_playing = await play_audio(bot_voice_client, audio_name)
+                    keep_playing = await audio_handler.play_audio(
+                        bot_voice_client, audio_name
+                    )
                     if not keep_playing:
                         print("Replay stopped")
                         break
@@ -142,20 +148,22 @@ def set_commands(bot):
     async def vol(ctx, audio, volume: float | None = None):
         try:
             idx = int(audio) - 1
-            audio = AUDIO_NAMES[idx]
-        except ValueError:
+            audio = constants.AUDIO_NAMES[idx]
+        except (ValueError, TypeError):
             pass
+        if audio not in constants.AUDIO_NAMES:
+            await ctx.reply(f"Audio '{audio}' not found.")
+            return
         if volume is None:
-            volume = volumes[audio]
-            await ctx.reply(f"Current volume: {volume}")
+            current_volume = volume_manager.get_volume(audio)
+            await ctx.reply(f"Current volume: {current_volume}")
         elif 0 <= volume <= 1:
-            volumes[audio] = volume
-            set_volumes_changed()
+            volume_manager.set_volume(audio, volume)
             print(f'"{audio}" now has volume {volume}')
 
     @bot.command()
     async def audios(ctx):
-        await ctx.reply(AUDIO_LIST)
+        await ctx.reply(constants.AUDIO_LIST)
 
     @bot.command()
     async def help(ctx):
@@ -175,7 +183,7 @@ def set_commands(bot):
 
     @bot.command()
     async def stop(ctx):
-        set_stop_playing()
+        audio_handler.set_stop_playing()
 
     @bot.command()
     async def send(ctx, *, msg: str):
