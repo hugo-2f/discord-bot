@@ -8,7 +8,7 @@ VOLUMES_RELATIVE_PATH: Path = VOLUMES_PATH.relative_to(ROOT_DIR)
 
 # === Audio Settings ===
 AUDIO_EXTENSIONS = [".mp3", ".m4a"]
-DEFAULT_VOLUME: float = 0.4
+DEFAULT_VOLUME: float = 0.3
 
 # === Audio File Names and List ===
 # Note: This will read the directory at import time.
