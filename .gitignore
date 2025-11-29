@@ -5,6 +5,5 @@ src/__pycache__
 # config files
 .env
 client_secrets.json
-variables.ini
-.idea
+variables.toml
 

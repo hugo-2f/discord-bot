@@ -9,7 +9,7 @@ Translates messages (sometimes) and plays music
 2. Create `.env` file with "DISCORD_TOKEN=your_token"
 
 4. Run `drive_integration.py` to initialize `credentials.json` delete if already exists
-5. Get `variables.ini`
+5. Get `variables.toml`
 
 ### Running the bot
 `uv run src/main.py`

@@ -1,6 +1,6 @@
 import asyncio
-import configparser
 import logging
+import tomllib
 
 import discord
 from discord.ext import commands
@@ -10,11 +10,11 @@ import constants
 import volume_manager
 
 logger = logging.getLogger(__name__)
-CONFIG_PATH = constants.ROOT_DIR / "variables.ini"
-config = configparser.ConfigParser()
-config.read(CONFIG_PATH)
-USER_IDS = {key: int(value) for key, value in config["USER_IDS"].items()}
-CHANNEL_IDS = {key: int(value) for key, value in config["CHANNEL_IDS"].items()}
+CONFIG_PATH = constants.ROOT_DIR / "variables.toml"
+with open(CONFIG_PATH, "rb") as f:
+    config = tomllib.load(f)
+USER_IDS = config["USER_IDS"]
+CHANNEL_IDS = config["CHANNEL_IDS"]
 channel_name = config["SETTINGS"]["channel_name"]
 
 command_lock = asyncio.Lock()
@@ -255,7 +255,7 @@ def set_commands(bot: commands.Bot) -> None:
         Sends msg and mentions user if not None
         Prints people that can be mentioned if msg is None
 
-        See variables.ini for users
+        See variables.toml for users
         Ex:
             !send asdf -> send 'asdf' in current channel
             !send asdf fsg -> send '@fsg asdf'
