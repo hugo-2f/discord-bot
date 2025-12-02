@@ -36,6 +36,7 @@ class General(commands.Cog):
 
         See variables.toml for users
         Ex:
+            !send -> reply with list of users
             !send asdf -> send 'asdf' in current channel
             !send asdf fsg -> send '@fsg asdf'
             !send asdf fsg, gaj -> send '@fsg @gaj asdf'
