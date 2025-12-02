@@ -4,9 +4,7 @@ import logging
 import discord
 from discord.ext import commands
 
-import audio_playback_handler
-import constants
-import volume_manager
+from utils import audio_playback_handler, constants, volume_manager
 
 logger = logging.getLogger(__name__)
 command_lock = asyncio.Lock()

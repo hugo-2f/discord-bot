@@ -5,7 +5,7 @@ import discord
 from discord.ext import commands
 from translate import Translator
 
-import constants
+from utils import constants
 
 logger = logging.getLogger(__name__)
 CONFIG_PATH = constants.ROOT_DIR / "variables.toml"

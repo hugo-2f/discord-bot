@@ -1,7 +1,7 @@
 from pathlib import Path
 
 # === Project Root and Paths ===
-ROOT_DIR: Path = Path(__file__).resolve().parent.parent
+ROOT_DIR: Path = Path(__file__).resolve().parent.parent.parent
 AUDIO_DIR: Path = ROOT_DIR / "audios"
 VOLUMES_PATH: Path = AUDIO_DIR / "volumes.json"
 VOLUMES_RELATIVE_PATH: Path = VOLUMES_PATH.relative_to(ROOT_DIR)

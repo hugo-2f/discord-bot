@@ -3,8 +3,7 @@ import logging
 
 import discord
 
-import constants
-import volume_manager
+from utils import constants, volume_manager
 
 logger = logging.getLogger(__name__)
 

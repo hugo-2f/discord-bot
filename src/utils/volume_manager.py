@@ -5,7 +5,7 @@ import subprocess
 from collections import defaultdict
 from typing import Dict
 
-import constants
+from utils import constants
 
 logger = logging.getLogger(__name__)
 

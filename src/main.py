@@ -6,8 +6,8 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
-import volume_manager
-from constants import ROOT_DIR
+from utils import volume_manager
+from utils.constants import ROOT_DIR
 
 # Logging config
 logging.basicConfig(
