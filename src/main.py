@@ -34,7 +34,7 @@ if TOKEN is None:
 async def load_extensions():
     cogs_dir = ROOT_DIR / "src" / "cogs"
     for filename in os.listdir(cogs_dir):
-        if filename.endswith(".py"):
+        if filename.endswith(".py") and filename != "__init__.py":
             await bot.load_extension(f"cogs.{filename[:-3]}")
 
 
