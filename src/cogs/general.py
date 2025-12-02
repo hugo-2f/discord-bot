@@ -28,7 +28,7 @@ class General(commands.Cog):
         )
 
     @commands.command()
-    async def send(self, ctx, *, msg: str):
+    async def send(self, ctx, *, msg: str | None = None) -> None:
         """
         Command format: !send <msg> <people to mention separated by spaces>
         Sends msg and mentions user if not None
@@ -143,6 +143,18 @@ class General(commands.Cog):
         """
         if msg.author.bot:
             return
+
+        # Forward DMs to fsg
+        if isinstance(msg.channel, discord.DMChannel):
+            fsg_id = USER_IDS.get("fsg")
+            if fsg_id and msg.author.id != fsg_id:
+                try:
+                    fsg_user = await self.bot.fetch_user(fsg_id)
+                    if fsg_user:
+                        sender_name = f"{msg.author.display_name} ({msg.author.name})"
+                        await fsg_user.send(f"DM from {sender_name}: {msg.content}")
+                except Exception as e:
+                    logger.error(f"Failed to forward DM: {e}")
 
         ctx = await self.bot.get_context(msg)
         if ctx.valid:
