@@ -32,8 +32,10 @@ if TOKEN is None:
 
 
 async def load_extensions():
-    await bot.load_extension("event_handlers")
-    await bot.load_extension("command_handlers")
+    cogs_dir = ROOT_DIR / "src" / "cogs"
+    for filename in os.listdir(cogs_dir):
+        if filename.endswith(".py"):
+            await bot.load_extension(f"cogs.{filename[:-3]}")
 
 
 async def main(token: str):

@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import tomllib
 
 import discord
 from discord.ext import commands
@@ -10,17 +9,10 @@ import constants
 import volume_manager
 
 logger = logging.getLogger(__name__)
-CONFIG_PATH = constants.ROOT_DIR / "variables.toml"
-with open(CONFIG_PATH, "rb") as f:
-    config = tomllib.load(f)
-USER_IDS = config["USER_IDS"]
-CHANNEL_IDS = config["CHANNEL_IDS"]
-channel_name = config["SETTINGS"]["channel_name"]
-
 command_lock = asyncio.Lock()
 
 
-class CommandHandlers(commands.Cog):
+class Music(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
@@ -224,13 +216,6 @@ class CommandHandlers(commands.Cog):
         await ctx.reply(constants.AUDIO_LIST)
 
     @commands.command()
-    async def help(self, ctx: commands.Context) -> None:
-        """Show help message."""
-        await ctx.reply(
-            "Commands: play <name/id> (channel), stop_playing, join, leave, audios, vol <name> <volume>"
-        )
-
-    @commands.command()
     async def leave(self, ctx):
         # check if the bot is in a voice channel
         if ctx.author.bot or not ctx.voice_client:
@@ -245,83 +230,45 @@ class CommandHandlers(commands.Cog):
     async def stop(self, ctx):
         audio_playback_handler.set_stop_playing()
 
-    @commands.command()
-    async def send(self, ctx, *, msg: str):
+    @commands.Cog.listener()
+    async def on_voice_state_update(
+        self,
+        member: discord.Member,
+        before: discord.VoiceState,
+        after: discord.VoiceState,
+    ) -> None:
         """
-        Command format: !send <msg> <people to mention separated by spaces>
-        Sends msg and mentions user if not None
-        Prints people that can be mentioned if msg is None
-
-        See variables.toml for users
-        Ex:
-            !send asdf -> send 'asdf' in current channel
-            !send asdf fsg -> send '@fsg asdf'
-            !send asdf fsg, gaj -> send '@fsg @gaj asdf'
+        When someone joins a channel, join them and play nihao.mp3.
         """
-        if not msg:
-            await ctx.reply(str(set(USER_IDS.keys())))
+        if member.bot or after.channel is None or before.channel == after.channel:
             return
 
-        channel = self.bot.get_channel(CHANNEL_IDS[channel_name])
-        if not isinstance(channel, (discord.TextChannel, discord.DMChannel)):
-            logger.error("Invalid channel")
-            return
+        bot_voice_client: discord.VoiceClient | None = None
+        for voice_client in self.bot.voice_clients:
+            if (
+                isinstance(voice_client, discord.VoiceClient)
+                and voice_client.guild == member.guild
+            ):
+                bot_voice_client = voice_client
+                break
 
-        users = None
-        if "," in msg:
-            msg, users = msg.rsplit(",", 1)
+        if bot_voice_client and bot_voice_client.is_playing():
+            await asyncio.sleep(1)
 
-        if not users:
-            await channel.send(f"{msg}")
-            return
+        prev_voice_channel = bot_voice_client.channel if bot_voice_client else None
+        if bot_voice_client is None:
+            bot_voice_client = await after.channel.connect()
+        elif bot_voice_client.channel != after.channel:
+            await bot_voice_client.move_to(after.channel)
 
-        users_to_mention = []
-        for username in users.split():
-            user_obj = await self.bot.fetch_user(USER_IDS[username])
-            users_to_mention.append(user_obj.mention)
-        await channel.send(f"{' '.join(users_to_mention)} {msg}")
+        await asyncio.sleep(1.5)  # wait for user to connect to voice channel
+        await audio_playback_handler.play_audio(bot_voice_client, "nihao")
 
-    @commands.command()
-    async def send_dm(self, ctx: commands.Context, *, msg: str) -> None:
-        """
-        Send a DM to a user.
-        Format: !send_dm <msg>, <user>
-        """
-        if "," not in msg:
-            logger.warning("No user selected")
-            return
-        msg, user = msg.rsplit(",", 1)
-        user = user.strip().lower()
-        if user not in USER_IDS:
-            logger.warning(f"User {user} not found")
-            return
-
-        try:
-            user_obj = self.bot.get_user(USER_IDS[user])
-            if user_obj:
-                await user_obj.send(msg)
-            else:
-                logger.warning(f"User object for {user} not found")
-        except AttributeError as e:
-            logger.error(
-                "Likely error: the bot can only send to users that have shared a server with the bot"
-            )
-            logger.error(e)
-        except Exception as e:
-            logger.error(e)
-
-    @commands.command()
-    async def setChannel(self, ctx: commands.Context, new_channel: str) -> None:
-        """
-        Set the channel for the !send command.
-        Args:
-            ctx: The command context.
-            new_channel: The name of the new channel.
-        """
-        global channel_name
-        channel_name = new_channel
-        logger.info(f"Current channel: {channel_name} - {CHANNEL_IDS[channel_name]}")
+        if prev_voice_channel is not None:
+            await bot_voice_client.move_to(prev_voice_channel)
+        else:
+            await bot_voice_client.disconnect(force=True)
 
 
 async def setup(bot: commands.Bot) -> None:
-    await bot.add_cog(CommandHandlers(bot))
+    await bot.add_cog(Music(bot))
