@@ -20,16 +20,13 @@ channel_name = config["SETTINGS"]["channel_name"]
 command_lock = asyncio.Lock()
 
 
-def set_commands(bot: commands.Bot) -> None:
-    """
-    Register all command handlers for the bot.
-    Args:
-        bot: The Discord bot instance.
-    """
+class CommandHandlers(commands.Cog):
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
 
-    @bot.command()
+    @commands.command()
     async def play(
-        ctx: commands.Context, audio_name: str, channel: str | None = None
+        self, ctx: commands.Context, audio_name: str, channel: str | None = None
     ) -> None:
         """
         Play an audio file in a voice channel.
@@ -96,9 +93,9 @@ def set_commands(bot: commands.Bot) -> None:
                 else:
                     await bot_voice_client.disconnect()
 
-    @bot.command()
+    @commands.command()
     async def replay(
-        ctx: commands.Context, audio_name: str | None = None, count: int = 0
+        self, ctx: commands.Context, audio_name: str | None = None, count: int = 0
     ) -> None:
         """
         Replay an audio file multiple times.
@@ -171,8 +168,8 @@ def set_commands(bot: commands.Bot) -> None:
                     else:
                         await bot_voice_client.disconnect()
 
-    @bot.command()
-    async def join(ctx: commands.Context, channel: str | None = None) -> None:
+    @commands.command()
+    async def join(self, ctx: commands.Context, channel: str | None = None) -> None:
         """
         Join a voice channel.
         Args:
@@ -208,8 +205,8 @@ def set_commands(bot: commands.Bot) -> None:
         else:
             await voice_channel.connect()
 
-    @bot.command()
-    async def vol(ctx, audio_name: str, volume: float | None = None):
+    @commands.command()
+    async def vol(self, ctx, audio_name: str, volume: float | None = None):
         resolved_name = audio_playback_handler.resolve_audio_name(audio_name)
         if not resolved_name:
             await ctx.reply(f"Audio '{audio_name}' not found.")
@@ -221,20 +218,20 @@ def set_commands(bot: commands.Bot) -> None:
             volume_manager.set_volume(resolved_name, volume)
             logger.info(f'"{resolved_name}" now has volume {volume}')
 
-    @bot.command()
-    async def audios(ctx: commands.Context) -> None:
+    @commands.command()
+    async def audios(self, ctx: commands.Context) -> None:
         """List all available audio files."""
         await ctx.reply(constants.AUDIO_LIST)
 
-    @bot.command()
-    async def help(ctx: commands.Context) -> None:
+    @commands.command()
+    async def help(self, ctx: commands.Context) -> None:
         """Show help message."""
         await ctx.reply(
             "Commands: play <name/id> (channel), stop_playing, join, leave, audios, vol <name> <volume>"
         )
 
-    @bot.command()
-    async def leave(ctx):
+    @commands.command()
+    async def leave(self, ctx):
         # check if the bot is in a voice channel
         if ctx.author.bot or not ctx.voice_client:
             print("Bot is not currently in a voice channel.")
@@ -244,12 +241,12 @@ def set_commands(bot: commands.Bot) -> None:
         if isinstance(ctx.voice_client, discord.VoiceClient):
             await ctx.voice_client.disconnect()
 
-    @bot.command()
-    async def stop(ctx):
+    @commands.command()
+    async def stop(self, ctx):
         audio_playback_handler.set_stop_playing()
 
-    @bot.command()
-    async def send(ctx, *, msg: str):
+    @commands.command()
+    async def send(self, ctx, *, msg: str):
         """
         Command format: !send <msg> <people to mention separated by spaces>
         Sends msg and mentions user if not None
@@ -265,7 +262,7 @@ def set_commands(bot: commands.Bot) -> None:
             await ctx.reply(str(set(USER_IDS.keys())))
             return
 
-        channel = bot.get_channel(CHANNEL_IDS[channel_name])
+        channel = self.bot.get_channel(CHANNEL_IDS[channel_name])
         if not isinstance(channel, (discord.TextChannel, discord.DMChannel)):
             logger.error("Invalid channel")
             return
@@ -280,12 +277,12 @@ def set_commands(bot: commands.Bot) -> None:
 
         users_to_mention = []
         for username in users.split():
-            user_obj = await bot.fetch_user(USER_IDS[username])
+            user_obj = await self.bot.fetch_user(USER_IDS[username])
             users_to_mention.append(user_obj.mention)
         await channel.send(f"{' '.join(users_to_mention)} {msg}")
 
-    @bot.command()
-    async def send_dm(ctx: commands.Context, *, msg: str) -> None:
+    @commands.command()
+    async def send_dm(self, ctx: commands.Context, *, msg: str) -> None:
         """
         Send a DM to a user.
         Format: !send_dm <msg>, <user>
@@ -300,7 +297,7 @@ def set_commands(bot: commands.Bot) -> None:
             return
 
         try:
-            user_obj = bot.get_user(USER_IDS[user])
+            user_obj = self.bot.get_user(USER_IDS[user])
             if user_obj:
                 await user_obj.send(msg)
             else:
@@ -313,8 +310,8 @@ def set_commands(bot: commands.Bot) -> None:
         except Exception as e:
             logger.error(e)
 
-    @bot.command()
-    async def setChannel(ctx: commands.Context, new_channel: str) -> None:
+    @commands.command()
+    async def setChannel(self, ctx: commands.Context, new_channel: str) -> None:
         """
         Set the channel for the !send command.
         Args:
@@ -324,3 +321,7 @@ def set_commands(bot: commands.Bot) -> None:
         global channel_name
         channel_name = new_channel
         logger.info(f"Current channel: {channel_name} - {CHANNEL_IDS[channel_name]}")
+
+
+async def setup(bot: commands.Bot) -> None:
+    await bot.add_cog(CommandHandlers(bot))

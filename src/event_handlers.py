@@ -10,32 +10,29 @@ import constants
 
 logger = logging.getLogger(__name__)
 
-# ========== Setup ==========
 
+class EventHandlers(commands.Cog):
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
 
-def set_events(bot: commands.Bot) -> None:
-    """
-    Register all event handlers for the bot.
-    Args:
-        bot: The Discord bot instance.
-    """
-
-    @bot.event
-    async def on_ready() -> None:
+    @commands.Cog.listener()
+    async def on_ready(self) -> None:
         """Log when the bot is ready."""
-        logger.info(f"Logged in as {bot.user}")
+        logger.info(f"Logged in as {self.bot.user}")
 
-    @bot.event
-    async def on_raw_reaction_add(payload: discord.RawReactionActionEvent) -> None:
+    @commands.Cog.listener()
+    async def on_raw_reaction_add(
+        self, payload: discord.RawReactionActionEvent
+    ) -> None:
         """
         Translate a message when a country flag reaction is added.
         Args:
             payload: The raw reaction event payload.
         """
-        user = await bot.fetch_user(payload.user_id)
+        user = await self.bot.fetch_user(payload.user_id)
         if user.bot:
             return
-        channel = await bot.fetch_channel(payload.channel_id)
+        channel = await self.bot.fetch_channel(payload.channel_id)
         if isinstance(channel, discord.TextChannel):
             msg = await channel.fetch_message(payload.message_id)
         else:
@@ -47,8 +44,9 @@ def set_events(bot: commands.Bot) -> None:
             translation = Translator(to_lang=to_lang).translate(msg.content)
             await msg.reply(translation)
 
-    @bot.event
+    @commands.Cog.listener()
     async def on_voice_state_update(
+        self,
         member: discord.Member,
         before: discord.VoiceState,
         after: discord.VoiceState,
@@ -60,7 +58,7 @@ def set_events(bot: commands.Bot) -> None:
             return
 
         bot_voice_client: discord.VoiceClient | None = None
-        for voice_client in bot.voice_clients:
+        for voice_client in self.bot.voice_clients:
             if (
                 isinstance(voice_client, discord.VoiceClient)
                 and voice_client.guild == member.guild
@@ -85,8 +83,8 @@ def set_events(bot: commands.Bot) -> None:
         else:
             await bot_voice_client.disconnect(force=True)
 
-    @bot.event
-    async def on_message(msg: discord.Message) -> None:
+    @commands.Cog.listener()
+    async def on_message(self, msg: discord.Message) -> None:
         """
         Handle incoming messages, process commands, and respond to certain keywords.
         Args:
@@ -95,7 +93,7 @@ def set_events(bot: commands.Bot) -> None:
         if msg.author.bot:
             return
 
-        ctx = await bot.get_context(msg)
+        ctx = await self.bot.get_context(msg)
         if ctx.valid:
             logger.info(f"Command received: {msg.content}")
             if ctx.command:
@@ -107,10 +105,8 @@ def set_events(bot: commands.Bot) -> None:
                 ):  # delete message if '!vol audio_name value'
                     await msg.delete()
 
-            await bot.invoke(ctx)
-
-    @bot.event
-    async def on_message_delete(msg: discord.Message) -> None:
+    @commands.Cog.listener()
+    async def on_message_delete(self, msg: discord.Message) -> None:
         """
         Echo deleted messages, except for bot commands.
         Args:
@@ -119,9 +115,13 @@ def set_events(bot: commands.Bot) -> None:
         if msg.author.bot:
             return
 
-        ctx = await bot.get_context(msg)
+        ctx = await self.bot.get_context(msg)
         if ctx.valid:
             return
 
         deleted_message = f"{msg.author.display_name} just recalled:\n{msg.content}"
         await msg.channel.send(deleted_message)
+
+
+async def setup(bot: commands.Bot) -> None:
+    await bot.add_cog(EventHandlers(bot))
