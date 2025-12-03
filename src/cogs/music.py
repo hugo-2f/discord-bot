@@ -236,7 +236,7 @@ class Music(commands.Cog):
         after: discord.VoiceState,
     ) -> None:
         """
-        When someone joins a channel, join them and play nihao.mp3.
+        When someone joins a channel, join them and play nihao.mp3, then return to the previous channel
         """
         if member.bot or after.channel is None or before.channel == after.channel:
             return
@@ -251,21 +251,29 @@ class Music(commands.Cog):
                 break
 
         if bot_voice_client and bot_voice_client.is_playing():
-            await asyncio.sleep(1)
+            bot_voice_client.stop()
 
-        prev_voice_channel = bot_voice_client.channel if bot_voice_client else None
-        if bot_voice_client is None:
-            bot_voice_client = await after.channel.connect()
-        elif bot_voice_client.channel != after.channel:
-            await bot_voice_client.move_to(after.channel)
+        async with command_lock:
+            if bot_voice_client and not bot_voice_client.is_connected():
+                bot_voice_client = None
 
-        await asyncio.sleep(1.5)  # wait for user to connect to voice channel
-        await audio_playback_handler.play_audio(bot_voice_client, "nihao")
+            prev_bot_voice_channel = (
+                bot_voice_client.channel if bot_voice_client else None
+            )
+            # If not currently in a channel or in different channel, join the user's channel
+            if not bot_voice_client:
+                bot_voice_client = await after.channel.connect()
+            elif bot_voice_client.channel != after.channel:
+                await bot_voice_client.move_to(after.channel)
 
-        if prev_voice_channel is not None:
-            await bot_voice_client.move_to(prev_voice_channel)
-        else:
-            await bot_voice_client.disconnect(force=True)
+            await asyncio.sleep(1.5)  # wait for user to connect to voice channel
+            await audio_playback_handler.play_audio(bot_voice_client, "nihao")
+
+            # Go back to previous channel if exists
+            if prev_bot_voice_channel:
+                await bot_voice_client.move_to(prev_bot_voice_channel)
+            else:
+                await bot_voice_client.disconnect(force=True)
 
 
 async def setup(bot: commands.Bot) -> None:
