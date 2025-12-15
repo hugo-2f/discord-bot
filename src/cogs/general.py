@@ -80,11 +80,10 @@ class General(commands.Cog):
             return
 
         try:
-            user_obj = self.bot.get_user(USER_IDS[user])
-            if user_obj:
-                await user_obj.send(msg)
-            else:
-                logger.warning(f"User object for {user} not found")
+            user_obj = await self.bot.fetch_user(USER_IDS[user])
+            await user_obj.send(msg)
+        except discord.NotFound:
+            logger.warning(f"User object for {user} not found")
         except AttributeError as e:
             logger.error(
                 "Likely error: the bot can only send to users that have shared a server with the bot"
@@ -152,7 +151,18 @@ class General(commands.Cog):
                     fsg_user = await self.bot.fetch_user(fsg_id)
                     if fsg_user:
                         sender_name = f"{msg.author.display_name} ({msg.author.name})"
-                        await fsg_user.send(f"DM from {sender_name}: {msg.content}")
+                        content = msg.content
+                        if not content and msg.attachments:
+                            content = " ".join([a.url for a in msg.attachments])
+                        elif msg.attachments:
+                            content += "\n" + " ".join([a.url for a in msg.attachments])
+
+                        if content:
+                            await fsg_user.send(f"DM from {sender_name}: {content}")
+                        else:
+                            logger.warning(
+                                f"Received empty DM from {sender_name} with no attachments"
+                            )
                 except Exception as e:
                     logger.error(f"Failed to forward DM: {e}")
 
