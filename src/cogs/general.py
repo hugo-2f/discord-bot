@@ -84,6 +84,8 @@ class General(commands.Cog):
             await user_obj.send(msg)
         except discord.NotFound:
             logger.warning(f"User object for {user} not found")
+        except discord.Forbidden:
+            logger.warning(f"Cannot send DM to {user} (Forbidden)")
         except AttributeError as e:
             logger.error(
                 "Likely error: the bot can only send to users that have shared a server with the bot"
@@ -163,6 +165,10 @@ class General(commands.Cog):
                             logger.warning(
                                 f"Received empty DM from {sender_name} with no attachments"
                             )
+                except discord.Forbidden:
+                    logger.error(
+                        "Failed to forward DM: Forbidden. Check if the target user has DMs enabled."
+                    )
                 except Exception as e:
                     logger.error(f"Failed to forward DM: {e}")
 
