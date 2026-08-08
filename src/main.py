@@ -6,10 +6,11 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
-from utils import volume_manager
+from utils import channel_manager, volume_manager
 from utils.constants import ROOT_DIR
 
 # Logging config
+logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -38,11 +39,50 @@ async def load_extensions():
             await bot.load_extension(f"cogs.{filename[:-3]}")
 
 
+async def terminal_commands() -> None:
+    await bot.wait_until_ready()
+
+    while not bot.is_closed():
+        command = await asyncio.to_thread(input, "bot> ")
+
+        if command.startswith("send_emoji "):
+            emoji_name = command.removeprefix("send_emoji ").strip()
+            emojis = await bot.fetch_application_emojis()
+            emoji = discord.utils.get(emojis, name=emoji_name)
+
+            if emoji is None:
+                logger.warning("Application emoji not found: %s", emoji_name)
+            else:
+                await channel_manager.send_to_current_channel(bot, str(emoji))
+            continue
+
+        if not command.startswith("send "):
+            logger.warning(
+                "Unknown terminal command. Use 'send <message>', "
+                "or 'send_emoji <name>'."
+            )
+            continue
+
+        message = command.removeprefix("send").strip()
+        await channel_manager.send_to_current_channel(bot, message)
+
+
 async def main(token: str):
-    async with bot:
+    terminal_task = None
+    try:
         await load_extensions()
+        terminal_task = asyncio.create_task(terminal_commands())
         await bot.start(token)
+    finally:
+        if not bot.is_closed():
+            await bot.close()
+        if terminal_task is not None:
+            terminal_task.cancel()
+            await asyncio.gather(terminal_task, return_exceptions=True)
 
 
 if __name__ == "__main__":
-    asyncio.run(main(TOKEN))
+    try:
+        asyncio.run(main(TOKEN))
+    except KeyboardInterrupt:
+        logger.info("Bot stopped")

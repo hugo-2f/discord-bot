@@ -5,7 +5,7 @@ import discord
 from discord.ext import commands
 from translate import Translator
 
-from utils import constants
+from utils import channel_manager, constants
 
 logger = logging.getLogger(__name__)
 CONFIG_PATH = constants.ROOT_DIR / "variables.toml"
@@ -13,7 +13,7 @@ with open(CONFIG_PATH, "rb") as f:
     config = tomllib.load(f)
 USER_IDS = config["USER_IDS"]
 CHANNEL_IDS = config["CHANNEL_IDS"]
-channel_name = config["SETTINGS"]["channel_name"]
+constants.CURRENT_CHANNEL_ID = CHANNEL_IDS[config["SETTINGS"]["default_channel"]]
 
 
 class General(commands.Cog):
@@ -24,45 +24,64 @@ class General(commands.Cog):
     async def help(self, ctx: commands.Context) -> None:
         """Show help message."""
         await ctx.reply(
-            "Commands: play <name/id> (channel), stop_playing, join, leave, audios, vol <name> <volume>"
+            "Commands: play <name/id> (channel), stop_playing, join, leave, audios, vol <name> <volume>, send_emoji <name>"
         )
 
     @commands.command()
     async def send(self, ctx, *, msg: str | None = None) -> None:
         """
-        Command format: !send <msg> <people to mention separated by spaces>
-        Sends msg and mentions user if not None
+        Send a message, optionally mentioning configured users.
+
+        Formats:
+            !send <message>
+            !send <message> --to <username> [<username> ...]
+
         Prints people that can be mentioned if msg is None
 
         See variables.toml for users
         Ex:
             !send -> reply with list of users
             !send asdf -> send 'asdf' in current channel
-            !send asdf fsg -> send '@fsg asdf'
-            !send asdf fsg, gaj -> send '@fsg @gaj asdf'
+            !send asdf --to fsg -> send '@fsg asdf'
+            !send asdf --to fsg gaj -> send '@fsg @gaj asdf'
         """
         if not msg:
-            await ctx.reply(str(set(USER_IDS.keys())))
+            await ctx.reply(", ".join(USER_IDS.keys()))
             return
 
-        channel = self.bot.get_channel(CHANNEL_IDS[channel_name])
-        if not isinstance(channel, (discord.TextChannel, discord.DMChannel)):
-            logger.error("Invalid channel")
+        message, separator, users_text = msg.partition("--to")
+        message = message.strip()
+        if not message:
+            await ctx.reply("Please provide a message to send.")
             return
 
-        users = None
-        if "," in msg:
-            msg, users = msg.rsplit(",", 1)
-
-        if not users:
-            await channel.send(f"{msg}")
+        if not separator:
+            await channel_manager.send_to_current_channel(self.bot, message)
             return
 
         users_to_mention = []
-        for username in users.split():
-            user_obj = await self.bot.fetch_user(USER_IDS[username])
+        for username in users_text.split():
+            user_id = USER_IDS.get(username.lower())
+            if user_id is None:
+                await ctx.reply(f"Unknown user '{username}'.")
+                return
+            user_obj = await self.bot.fetch_user(user_id)
             users_to_mention.append(user_obj.mention)
-        await channel.send(f"{' '.join(users_to_mention)} {msg}")
+        await channel_manager.send_to_current_channel(
+            self.bot, f"{' '.join(users_to_mention)} {message}"
+        )
+
+    @commands.command()
+    async def send_emoji(self, ctx: commands.Context, emoji_name: str) -> None:
+        """Send an application emoji by name to the current channel."""
+        emojis = await self.bot.fetch_application_emojis()
+        emoji = next((item for item in emojis if item.name == emoji_name), None)
+        if emoji is None:
+            await ctx.reply(f"Application emoji '{emoji_name}' not found.")
+            return
+
+        if await channel_manager.send_to_current_channel(self.bot, str(emoji)):
+            await ctx.reply(f"Sent application emoji '{emoji_name}'.")
 
     @commands.command()
     async def send_dm(self, ctx: commands.Context, *, msg: str) -> None:
@@ -102,9 +121,9 @@ class General(commands.Cog):
             ctx: The command context.
             new_channel: The name of the new channel.
         """
-        global channel_name
-        channel_name = new_channel
-        logger.info(f"Current channel: {channel_name} - {CHANNEL_IDS[channel_name]}")
+        channel_id = CHANNEL_IDS[new_channel]
+        constants.CURRENT_CHANNEL_ID = channel_id
+        logger.info(f"Current channel: {new_channel} - {channel_id}")
 
     @commands.Cog.listener()
     async def on_ready(self) -> None:
