@@ -91,7 +91,7 @@ class General(commands.Cog):
                 "Likely error: the bot can only send to users that have shared a server with the bot"
             )
             logger.error(e)
-        except Exception as e:
+        except discord.DiscordException as e:
             logger.error(e)
 
     @commands.command()
@@ -169,7 +169,7 @@ class General(commands.Cog):
                     logger.error(
                         "Failed to forward DM: Forbidden. Check if the target user has DMs enabled."
                     )
-                except Exception as e:
+                except discord.DiscordException as e:
                     logger.error(f"Failed to forward DM: {e}")
 
         ctx = await self.bot.get_context(msg)

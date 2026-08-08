@@ -3,13 +3,12 @@ import json
 import logging
 import subprocess
 from collections import defaultdict
-from typing import Dict
 
 from utils import constants
 
 logger = logging.getLogger(__name__)
 
-_volumes: Dict[str, float] = defaultdict(lambda: constants.DEFAULT_VOLUME)
+_volumes: dict[str, float] = defaultdict(lambda: constants.DEFAULT_VOLUME)
 _volumes_changed: bool = False
 
 
@@ -73,7 +72,7 @@ def set_volume(audio_name: str, value: float) -> None:
     set_volumes_changed()
 
 
-def all_volumes() -> Dict[str, float]:
+def all_volumes() -> dict[str, float]:
     """
     Get a copy of all volumes.
     Returns:
