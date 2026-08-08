@@ -95,7 +95,7 @@ class General(commands.Cog):
             logger.error(e)
 
     @commands.command()
-    async def setChannel(self, ctx: commands.Context, new_channel: str) -> None:
+    async def set_channel(self, ctx: commands.Context, new_channel: str) -> None:
         """
         Set the channel for the !send command.
         Args:
