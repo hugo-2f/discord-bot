@@ -1,4 +1,3 @@
-import atexit
 import json
 import logging
 import subprocess
@@ -14,7 +13,7 @@ _volumes_changed: bool = False
 
 def fetch_and_initialize_volumes() -> None:
     """
-    Fetch the latest volumes.json from GitHub and load it into memory.
+    Fetch the latest _volumes.json from GitHub and load it into memory.
     """
     try:
         subprocess.run(["git", "fetch"], check=True)
@@ -28,7 +27,7 @@ def fetch_and_initialize_volumes() -> None:
             ],
             check=True,
         )
-        logger.info("Successfully fetched volumes.json")
+        logger.info("Successfully fetched _volumes.json")
     except subprocess.CalledProcessError as e:
         logger.warning(f"Failed to fetch newest volumes: {e}")
 
@@ -89,11 +88,11 @@ def set_volumes_changed() -> None:
     _volumes_changed = True
 
 
-@atexit.register
 def save_and_push_volumes() -> None:
     """
-    Save volumes.json and push to git if there were changes.
+    Save _volumes.json and push to git if there were changes.
     """
+    global _volumes_changed
     if not _volumes_changed:
         logger.info("No volume changes to save.")
         return
@@ -108,8 +107,9 @@ def save_and_push_volumes() -> None:
         json.dump(_volumes, f, indent=4)
     try:
         subprocess.run(["git", "add", str(constants.VOLUMES_RELATIVE_PATH)], check=True)
-        subprocess.run(["git", "commit", "-m", "update volumes.json"], check=True)
+        subprocess.run(["git", "commit", "-m", "update _volumes.json"], check=True)
         subprocess.run(["git", "push", "origin", "main"], check=True)
-        logger.info("volumes.json pushed to GitHub")
+        _volumes_changed = False
+        logger.info("_volumes.json pushed to GitHub")
     except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to push volumes.json: {e}")
+        logger.error(f"Failed to push _volumes.json: {e}")

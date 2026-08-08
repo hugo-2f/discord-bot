@@ -79,6 +79,7 @@ async def main(token: str):
         if terminal_task is not None:
             terminal_task.cancel()
             await asyncio.gather(terminal_task, return_exceptions=True)
+        volume_manager.save_and_push_volumes()
 
 
 if __name__ == "__main__":
